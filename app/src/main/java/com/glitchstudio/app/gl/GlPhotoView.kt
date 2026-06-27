@@ -15,7 +15,7 @@ class GlPhotoView(context: Context) : GLSurfaceView(context) {
     init {
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        preserveEGLContextOnPause(true)
+        preserveEGLContextOnPause = true
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
     }

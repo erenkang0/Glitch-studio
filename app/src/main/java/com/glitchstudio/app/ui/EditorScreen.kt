@@ -73,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -207,7 +208,7 @@ private fun GlCanvas(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(18.dp))
-                .androidx_onSized { canvasSize = it },
+                .onSizeChanged { canvasSize = it },
             factory = { ctx ->
                 GlPhotoView(ctx).also {
                     view = it
@@ -311,10 +312,6 @@ private fun toUv(
     val uy = ((pos.y - oy) / rh).coerceIn(0f, 1f)
     return androidx.compose.ui.geometry.Offset(ux, uy)
 }
-
-/** Small helper to capture the composable's pixel size. */
-private fun Modifier.androidx_onSized(onSize: (androidx.compose.ui.unit.IntSize) -> Unit): Modifier =
-    this.then(androidx.compose.ui.layout.onSizeChanged { onSize(it) })
 
 @Composable
 private fun TopBar(
