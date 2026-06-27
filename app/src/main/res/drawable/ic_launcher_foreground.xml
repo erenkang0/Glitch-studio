@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glitch / RGB-shift mark: three offset rounded bars -->
+    <group android:translateX="0" android:translateY="0">
+        <path
+            android:fillColor="#FF2DE2E6"
+            android:fillAlpha="0.9"
+            android:pathData="M34,34 h44 a6,6 0 0 1 6,6 v8 a6,6 0 0 1 -6,6 h-44 a6,6 0 0 1 -6,-6 v-8 a6,6 0 0 1 6,-6 z" />
+        <path
+            android:fillColor="#FFFF3DCB"
+            android:fillAlpha="0.9"
+            android:pathData="M30,50 h44 a6,6 0 0 1 6,6 v8 a6,6 0 0 1 -6,6 h-44 a6,6 0 0 1 -6,-6 v-8 a6,6 0 0 1 6,-6 z" />
+        <path
+            android:fillColor="#FFF5F5FA"
+            android:pathData="M38,66 h32 a6,6 0 0 1 6,6 v6 a6,6 0 0 1 -6,6 h-32 a6,6 0 0 1 -6,-6 v-6 a6,6 0 0 1 6,-6 z" />
+    </group>
+</vector>
