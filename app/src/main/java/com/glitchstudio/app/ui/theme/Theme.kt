@@ -1,6 +1,7 @@
 package com.glitchstudio.app.ui.theme
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -57,9 +58,12 @@ private val glitchScheme = darkColorScheme(
     error = GlitchColors.danger
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun GlitchTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
+    // Material 3 Expressive: pulls in expressive motion/shape defaults app-wide
+    // while keeping our custom dark colour scheme and typography.
+    MaterialExpressiveTheme(
         colorScheme = glitchScheme,
         typography = glitchTypography,
         content = content
