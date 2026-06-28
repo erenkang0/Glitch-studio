@@ -39,6 +39,9 @@ object Categories {
     const val COLOR = "Color"
     const val LIGHT = "Light"
     const val PATTERN = "Pattern"
+    const val ART = "Art"
+    const val TEXTURE = "Texture"
+    const val SCIFI = "Sci-Fi"
 
-    val ALL = listOf(GLITCH, RETRO, DISTORT, STYLIZE, COLOR, LIGHT, PATTERN)
+    val ALL = listOf(GLITCH, RETRO, DISTORT, STYLIZE, COLOR, LIGHT, PATTERN, ART, TEXTURE, SCIFI)
 }

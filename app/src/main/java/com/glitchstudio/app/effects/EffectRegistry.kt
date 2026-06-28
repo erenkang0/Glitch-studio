@@ -16,13 +16,16 @@ object EffectRegistry {
 
     val all: List<Effect> = buildList {
         add(original)
-        addAll(glitchEffects)
-        addAll(retroEffects)
-        addAll(distortEffects)
-        addAll(stylizeEffects)
-        addAll(colorEffects)
-        addAll(lightEffects)
-        addAll(patternEffects)
+        addAll(glitchEffects); addAll(glitchEffects2)
+        addAll(retroEffects); addAll(retroEffects2)
+        addAll(distortEffects); addAll(distortEffects2)
+        addAll(stylizeEffects); addAll(stylizeEffects2)
+        addAll(colorEffects); addAll(colorEffects2)
+        addAll(lightEffects); addAll(lightEffects2)
+        addAll(patternEffects); addAll(patternEffects2)
+        addAll(artEffects)
+        addAll(textureEffects)
+        addAll(sciFiEffects)
     }
 
     /** Number of creative effects, excluding the pass-through. */
