@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.glitchstudio.app"
-    compileSdk = 36
+    // Compose 1.12 (Material 3 Expressive) compiles against API 37; the app still
+    // targets Android 16 (API 36) at runtime.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.glitchstudio.app"
