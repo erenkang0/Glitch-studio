@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -81,6 +82,17 @@ class EditorViewModel : ViewModel() {
     var exportStatus by mutableStateOf<ExportStatus?>(null)
     var maskEditing by mutableStateOf(false)
 
+    /** Whether the bottom tool panel is slid up over the photo. */
+    var panelOpen by mutableStateOf(false)
+
+    /** On-screen zoom/pan of the canvas (preview only). */
+    var viewScale by mutableStateOf(1f); private set
+    var viewPanX by mutableStateOf(0f); private set
+    var viewPanY by mutableStateOf(0f); private set
+
+    /** Cached per-effect preview thumbnails for the current photo. */
+    val thumbnails = mutableStateMapOf<String, Bitmap>()
+
     /** Bumped on every state change so the GL layer can be refreshed cheaply. */
     var revision by mutableStateOf(0); private set
 
@@ -104,7 +116,40 @@ class EditorViewModel : ViewModel() {
             selectedIndex = 0
         }
         hasImage = true
+        thumbnails.clear()
+        resetZoom()
         touch()
+    }
+
+    // --- panel + zoom -------------------------------------------------------
+
+    fun togglePanel(tab: PanelTab) {
+        if (panelOpen && panelTab == tab) {
+            panelOpen = false
+        } else {
+            panelTab = tab
+            panelOpen = true
+        }
+    }
+
+    fun closePanel() { panelOpen = false }
+
+    fun applyTransform(zoomDelta: Float, panPxX: Float, panPxY: Float, viewW: Float, viewH: Float) {
+        val ns = (viewScale * zoomDelta).coerceIn(1f, 8f)
+        viewScale = ns
+        val lim = ns - 1f
+        if (viewW > 0f) viewPanX = (viewPanX + 2f * panPxX / viewW).coerceIn(-lim, lim)
+        if (viewH > 0f) viewPanY = (viewPanY - 2f * panPxY / viewH).coerceIn(-lim, lim)
+        touch()
+    }
+
+    fun resetZoom() {
+        viewScale = 1f; viewPanX = 0f; viewPanY = 0f
+        touch()
+    }
+
+    fun putThumbnail(id: String, bitmap: Bitmap?) {
+        if (bitmap != null) thumbnails[id] = bitmap
     }
 
     fun renderLayers(): List<RenderLayer> = layers.map { it.toRenderLayer() }
@@ -184,7 +229,11 @@ class EditorViewModel : ViewModel() {
     fun setBrushSize(v: Float) = updateSelected { it.copy(brushSize = v) }
     fun setBrushHardness(v: Float) = updateSelected { it.copy(brushHardness = v) }
     fun toggleBrushErase() = updateSelected { it.copy(brushErase = !it.brushErase) }
-    fun toggleMaskEditing() { maskEditing = !maskEditing }
+    fun toggleMaskEditing() {
+        maskEditing = !maskEditing
+        // Mask painting uses the un-zoomed fit mapping, so lock zoom while editing.
+        if (maskEditing) resetZoom()
+    }
 
     /** Paints a stroke (in 0..1 image space) onto the selected layer's mask. */
     fun paintMaskStroke(x0: Float, y0: Float, x1: Float, y1: Float) {
