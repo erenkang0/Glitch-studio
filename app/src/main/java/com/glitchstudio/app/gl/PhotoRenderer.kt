@@ -37,6 +37,8 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         val uMaskFeather = GLES20.glGetUniformLocation(id, "uMaskFeather")
         val uMaskAngle = GLES20.glGetUniformLocation(id, "uMaskAngle")
         val uMaskInvert = GLES20.glGetUniformLocation(id, "uMaskInvert")
+        val uVScale = GLES20.glGetUniformLocation(id, "uVScale")
+        val uVOffset = GLES20.glGetUniformLocation(id, "uVOffset")
         val pLoc = IntArray(8) { GLES20.glGetUniformLocation(id, "p$it") }
     }
 
@@ -77,6 +79,11 @@ class PhotoRenderer : GLSurfaceView.Renderer {
     /** When true the original photo is shown unmodified (before/after compare). */
     @Volatile var bypass: Boolean = false
 
+    /** On-screen zoom/pan (preview only; export is always full-frame). */
+    @Volatile var viewScale: Float = 1f
+    @Volatile var viewPanX: Float = 0f
+    @Volatile var viewPanY: Float = 0f
+
     @Volatile var lastFrameTime: Float = 0f
         private set
 
@@ -100,23 +107,36 @@ class PhotoRenderer : GLSurfaceView.Renderer {
     private val previewB = Fbo()
     private val exportA = Fbo()
     private val exportB = Fbo()
+    private val thumbA = Fbo()
+    private val thumbB = Fbo()
 
-    private val quadBuffer: FloatBuffer
+    // Orientation-preserving quad (off-screen chain passes).
+    private val quadNormalBuffer: FloatBuffer
+    // V-flipped quad (final on-screen blit only), so on-screen top = image top.
+    private val quadFlipBuffer: FloatBuffer
 
     private var animBaseNanos = System.nanoTime()
     private var pausedTime = 0f
     private var wasAnimating = false
 
     init {
-        val data = floatArrayOf(
+        // x, y, u, v
+        val normal = floatArrayOf(
+            -1f, -1f, 0f, 0f,
+            1f, -1f, 1f, 0f,
+            -1f, 1f, 0f, 1f,
+            1f, 1f, 1f, 1f
+        )
+        val flip = floatArrayOf(
             -1f, -1f, 0f, 1f,
             1f, -1f, 1f, 1f,
             -1f, 1f, 0f, 0f,
             1f, 1f, 1f, 0f
         )
-        quadBuffer = ByteBuffer.allocateDirect(data.size * 4)
-            .order(ByteOrder.nativeOrder()).asFloatBuffer()
-        quadBuffer.put(data).position(0)
+        quadNormalBuffer = ByteBuffer.allocateDirect(normal.size * 4)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(normal).position(0) }
+        quadFlipBuffer = ByteBuffer.allocateDirect(flip.size * 4)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(flip).position(0) }
     }
 
     // --- public API (UI thread) ---------------------------------------------
@@ -139,6 +159,7 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         whiteTex = 0
         maskTextures.clear()
         previewA.reset(); previewB.reset(); exportA.reset(); exportB.reset()
+        thumbA.reset(); thumbB.reset()
         sourceBitmap?.let { pendingBitmap = it }
     }
 
@@ -162,17 +183,17 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         if (bypass) {
             // Before/after: show the untouched source.
             GLES20.glViewport(rect[0], rect[1], w, h)
-            drawPassthrough(textureId, w, h)
+            drawPassthrough(textureId, w, h, viewScale, viewPanX, viewPanY)
             return
         }
 
         previewA.ensure(w, h); previewB.ensure(w, h)
-        val result = renderChain(previewA, previewB, w, h, t)
+        val result = renderChain(layers, previewA, previewB, w, h, t)
 
-        // Blit the final result to the screen, letter-boxed.
+        // Blit the final result to the screen, letter-boxed, with zoom/pan applied.
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glViewport(rect[0], rect[1], w, h)
-        drawPassthrough(result.tex, w, h)
+        drawPassthrough(result.tex, w, h, viewScale, viewPanX, viewPanY)
     }
 
     // --- internals ----------------------------------------------------------
@@ -252,9 +273,9 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         return texId
     }
 
-    /** Runs the whole layer stack into ping-pong FBOs, returning the result FBO. */
-    private fun renderChain(a: Fbo, b: Fbo, w: Int, h: Int, time: Float): Fbo {
-        val active = layers.filter { it.enabled }.ifEmpty { listOf(RenderLayer.original()) }
+    /** Runs the given layer stack into ping-pong FBOs, returning the result FBO. */
+    private fun renderChain(layersList: List<RenderLayer>, a: Fbo, b: Fbo, w: Int, h: Int, time: Float): Fbo {
+        val active = layersList.filter { it.enabled }.ifEmpty { listOf(RenderLayer.original()) }
         var inputTex = textureId
         var dst = a
         var other = b
@@ -271,19 +292,25 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         return lastRendered
     }
 
-    private fun bindQuad(p: Program) {
-        quadBuffer.position(0)
+    private fun bindQuad(p: Program, flip: Boolean) {
+        val buf = if (flip) quadFlipBuffer else quadNormalBuffer
+        buf.position(0)
         GLES20.glEnableVertexAttribArray(p.aPos)
-        GLES20.glVertexAttribPointer(p.aPos, 2, GLES20.GL_FLOAT, false, 16, quadBuffer)
-        quadBuffer.position(2)
+        GLES20.glVertexAttribPointer(p.aPos, 2, GLES20.GL_FLOAT, false, 16, buf)
+        buf.position(2)
         GLES20.glEnableVertexAttribArray(p.aTex)
-        GLES20.glVertexAttribPointer(p.aTex, 2, GLES20.GL_FLOAT, false, 16, quadBuffer)
+        GLES20.glVertexAttribPointer(p.aTex, 2, GLES20.GL_FLOAT, false, 16, buf)
     }
 
-    private fun drawLayer(layer: RenderLayer, inputTex: Int, w: Int, h: Int, time: Float) {
+    private fun drawLayer(
+        layer: RenderLayer, inputTex: Int, w: Int, h: Int, time: Float,
+        flip: Boolean = false, sx: Float = 1f, sy: Float = 1f, ox: Float = 0f, oy: Float = 0f
+    ) {
         val p = programFor(layer.effect)
         GLES20.glUseProgram(p.id)
-        bindQuad(p)
+        bindQuad(p, flip)
+        if (p.uVScale >= 0) GLES20.glUniform2f(p.uVScale, sx, sy)
+        if (p.uVOffset >= 0) GLES20.glUniform2f(p.uVOffset, ox, oy)
 
         // Resolve the mask texture first (may bind/upload on the active unit).
         val maskTex = ensureMaskTexture(layer)
@@ -313,8 +340,9 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(p.aTex)
     }
 
-    private fun drawPassthrough(inputTex: Int, w: Int, h: Int) {
-        drawLayer(RenderLayer.original(), inputTex, w, h, 0f)
+    private fun drawPassthrough(inputTex: Int, w: Int, h: Int, scale: Float, panX: Float, panY: Float) {
+        drawLayer(RenderLayer.original(), inputTex, w, h, 0f,
+            flip = true, sx = scale, sy = scale, ox = panX, oy = panY)
     }
 
     /** Render the full stack off-screen at [targetW] x [targetH] and read it back. */
@@ -323,8 +351,22 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         val w = targetW.coerceAtLeast(1)
         val h = targetH.coerceAtLeast(1)
         exportA.ensure(w, h); exportB.ensure(w, h)
-        val result = renderChain(exportA, exportB, w, h, time)
+        val result = renderChain(layers, exportA, exportB, w, h, time)
+        return readFbo(result, w, h)
+    }
 
+    /** Render a single effect (default params) on the source into a small preview bitmap. */
+    fun renderEffectThumbnail(effect: Effect, cap: Int): Bitmap? {
+        if (textureId == 0) return null
+        val size = outputSizeFor(cap)
+        val w = size[0]; val h = size[1]
+        thumbA.ensure(w, h); thumbB.ensure(w, h)
+        val layer = RenderLayer(0L, effect, FloatArray(8) { i -> effect.params.getOrNull(i)?.default ?: 0f })
+        val result = renderChain(listOf(layer), thumbA, thumbB, w, h, 0f)
+        return readFbo(result, w, h)
+    }
+
+    private fun readFbo(result: Fbo, w: Int, h: Int): Bitmap {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, result.fbo)
         val buffer = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
         GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
@@ -350,8 +392,10 @@ class PhotoRenderer : GLSurfaceView.Renderer {
         val bytes = ByteArray(w * h * 4)
         buffer.get(bytes)
         val ints = IntArray(w * h)
+        // Chain passes preserve orientation (image top stored at t=0), and
+        // glReadPixels row 0 == t=0, so rows map straight through (no flip).
         for (y in 0 until h) {
-            val srcRow = (h - 1 - y) * w * 4
+            val srcRow = y * w * 4
             val dstRow = y * w
             for (x in 0 until w) {
                 val i = srcRow + x * 4

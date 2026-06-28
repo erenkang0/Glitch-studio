@@ -3,6 +3,7 @@ package com.glitchstudio.app.gl
 import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
+import com.glitchstudio.app.effects.Effect
 
 /**
  * A [GLSurfaceView] that hosts the [PhotoRenderer] and exposes a small,
@@ -39,6 +40,24 @@ class GlPhotoView(context: Context) : GLSurfaceView(context) {
     fun setBypass(bypass: Boolean) {
         renderer.bypass = bypass
         requestRender()
+    }
+
+    fun setViewTransform(scale: Float, panX: Float, panY: Float) {
+        renderer.viewScale = scale
+        renderer.viewPanX = panX
+        renderer.viewPanY = panY
+        requestRender()
+    }
+
+    /** Renders a small preview of each effect (default params) on the GL thread. */
+    fun renderThumbnails(effects: List<Effect>, cap: Int, onEach: (String, Bitmap?) -> Unit) {
+        queueEvent {
+            for (effect in effects) {
+                val bmp = renderer.renderEffectThumbnail(effect, cap)
+                onEach(effect.id, bmp)
+            }
+            requestRender()
+        }
     }
 
     /** Capture a single still of the current effect at full output resolution. */
