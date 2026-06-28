@@ -1,10 +1,12 @@
 package com.glitchstudio.app.ui.theme
 
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -58,14 +60,23 @@ private val glitchScheme = darkColorScheme(
     error = GlitchColors.danger
 )
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+// Expressive-language shapes: large, rounded, friendly corners.
+private val expressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(26.dp),
+    extraLarge = RoundedCornerShape(34.dp)
+)
+
 @Composable
 fun GlitchTheme(content: @Composable () -> Unit) {
-    // Material 3 Expressive: pulls in expressive motion/shape defaults app-wide
-    // while keeping our custom dark colour scheme and typography.
-    MaterialExpressiveTheme(
+    // Stable Material 3 styled in the Material 3 Expressive language (large rounded
+    // shapes, vibrant accents, springy motion applied at the component level).
+    MaterialTheme(
         colorScheme = glitchScheme,
         typography = glitchTypography,
+        shapes = expressiveShapes,
         content = content
     )
 }

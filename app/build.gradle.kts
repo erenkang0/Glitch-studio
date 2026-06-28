@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "com.glitchstudio.app"
-    // Compose 1.12 (Material 3 Expressive) compiles against API 37; the app still
-    // targets Android 16 (API 36) at runtime.
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.glitchstudio.app"
@@ -50,21 +48,24 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
+    // Compose BOM that supports compileSdk 36 (Android 16) with the stable
+    // toolchain. The literal Material 3 Expressive library (material3 1.5.0-alpha)
+    // requires Compose 1.12 / Android API 37, whose SDK platform is not yet
+    // downloadable, so we use stable Material 3 styled in the expressive language.
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
 
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
-    // Material 3 Expressive APIs live in the 1.5.0-alpha track (not in stable 1.4.x).
-    implementation("androidx.compose.material3:material3:1.5.0-alpha22")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
