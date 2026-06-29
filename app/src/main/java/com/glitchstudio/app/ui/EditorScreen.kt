@@ -169,15 +169,7 @@ fun EditorScreen(vm: EditorViewModel) {
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (vm.hasImage) {
-                    CanvasArea(vm, imageBitmap, glView, onReady = { glView = it })
-                    AnimatedVisibility(
-                        visible = vm.panelOpen,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
-                        exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(200))
-                    ) {
-                        PanelCard(vm, glView, imageBitmap)
-                    }
+                    CanvasWithPanel(vm, imageBitmap, glView, onReady = { glView = it })
                 } else {
                     EmptyState(onImport = { pick() })
                 }
@@ -197,6 +189,28 @@ fun EditorScreen(vm: EditorViewModel) {
 }
 
 // --- canvas ----------------------------------------------------------------
+
+/** Wraps the canvas and the slide-up tool panel in a dedicated Box so the panel's
+ *  AnimatedVisibility resolves unambiguously (no enclosing ColumnScope). */
+@Composable
+private fun CanvasWithPanel(
+    vm: EditorViewModel,
+    imageBitmap: Bitmap?,
+    glView: GlPhotoView?,
+    onReady: (GlPhotoView) -> Unit
+) {
+    Box(Modifier.fillMaxSize()) {
+        CanvasArea(vm, imageBitmap, glView, onReady)
+        AnimatedVisibility(
+            visible = vm.panelOpen,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
+            exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(200))
+        ) {
+            PanelCard(vm, glView, imageBitmap)
+        }
+    }
+}
 
 @Composable
 private fun CanvasArea(
