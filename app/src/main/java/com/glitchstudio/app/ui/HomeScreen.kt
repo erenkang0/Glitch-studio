@@ -70,7 +70,7 @@ fun HomeScreen(
         ) {
             LensMark()
 
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(32.dp))
 
             Text(
                 "Glitch Studio",
@@ -79,7 +79,7 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 "A shader darkroom for your photos.",
@@ -88,7 +88,7 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(26.dp))
+            Spacer(Modifier.height(24.dp))
 
             CategoryTeaser()
 
@@ -96,7 +96,7 @@ fun HomeScreen(
 
             AddPhotoButton(onClick = onPickImage, isLoading = isLoading)
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             MetaLine()
         }
@@ -128,7 +128,7 @@ private fun MetaLine() {
 private fun Dot(tint: Color) {
     Box(
         Modifier
-            .padding(horizontal = 10.dp)
+            .padding(horizontal = 8.dp)
             .size(3.dp)
             .clip(CircleShape)
             .background(tint),
@@ -158,7 +158,7 @@ private fun CategoryChip(label: String, dot: Color) {
             .clip(RoundedCornerShape(50))
             .background(colors.panel)
             .border(1.dp, colors.stroke, RoundedCornerShape(50))
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -167,7 +167,7 @@ private fun CategoryChip(label: String, dot: Color) {
                 .clip(CircleShape)
                 .background(dot),
         )
-        Spacer(Modifier.width(7.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
@@ -194,7 +194,7 @@ private fun AddPhotoButton(onClick: () -> Unit, isLoading: Boolean) {
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(if (isLoading) colors.accent.copy(alpha = 0.55f) else colors.accent)
             .clickableNoRipple(enabled = !isLoading) { onClick() }
             .padding(vertical = 16.dp),

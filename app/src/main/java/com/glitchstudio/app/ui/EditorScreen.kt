@@ -186,7 +186,7 @@ private fun EditorTopBar(
                 val y = size.height - 0.5.dp.toPx()
                 drawLine(colors.stroke, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
             }
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -194,7 +194,7 @@ private fun EditorTopBar(
             Spacer(Modifier.weight(1f))
             // Press and hold to compare with the original.
             CompareButton(onCompareChanged)
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             CircleIconButton(
                 Icons.Rounded.FileDownload, "Export", onExport,
                 background = colors.accent, tint = Color.White,
@@ -207,7 +207,7 @@ private fun EditorTopBar(
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textLow,
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 effectName,
                 style = MaterialTheme.typography.titleMedium,
@@ -224,7 +224,7 @@ private fun CompareButton(onCompareChanged: (Boolean) -> Unit) {
     var held by remember { mutableStateOf(false) }
     Box(
         Modifier
-            .size(42.dp)
+            .size(44.dp)
             .clip(CircleShape)
             .background(if (held) colors.panelElevated else colors.panel)
             .then(
@@ -263,7 +263,7 @@ private fun EffectCanvas(
     modifier: Modifier = Modifier,
 ) {
     val colors = GlitchTheme.colors
-    Box(modifier.padding(horizontal = 16.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.padding(horizontal = 16.dp, vertical = 16.dp), contentAlignment = Alignment.Center) {
         if (preview == null) {
             CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(28.dp))
             return@Box
@@ -322,10 +322,10 @@ private fun EffectCanvas(
                 Box(
                     Modifier
                         .align(Alignment.TopStart)
-                        .padding(10.dp)
+                        .padding(12.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color.Black.copy(alpha = 0.55f))
-                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
                         "ORIGINAL",
@@ -482,7 +482,7 @@ private fun ToolPanel(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp),
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -491,10 +491,10 @@ private fun ToolPanel(
                     .clip(CircleShape)
                     .background(categoryColor(effect.category, colors)),
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(effect.name, style = MaterialTheme.typography.titleMedium, color = colors.textHigh)
-                Spacer(Modifier.height(1.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     effect.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -503,30 +503,30 @@ private fun ToolPanel(
                 )
             }
             if (effect.params.isNotEmpty()) {
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
                 Row(
                     Modifier
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(colors.panelElevated)
                         .clickableNoRipple { onResetAll() }
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Refresh, "Reset", tint = colors.textMed, modifier = Modifier.size(15.dp))
+                    Icon(Icons.Rounded.Refresh, "Reset", tint = colors.textMed, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Reset", style = MaterialTheme.typography.labelLarge, color = colors.textMed)
                 }
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(20.dp))
 
         // Advanced settings (sliders) for the active effect.
         if (effect.params.isEmpty()) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp),
+                    .padding(horizontal = 16.dp),
             ) {
                 Text(
                     "This effect has no parameters.",
@@ -535,13 +535,13 @@ private fun ToolPanel(
                 )
             }
         } else {
-            SectionLabel("ADJUST", Modifier.padding(horizontal = 18.dp))
-            Spacer(Modifier.height(14.dp))
+            SectionLabel("ADJUST", Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(12.dp))
             Column(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 224.dp)
-                    .padding(horizontal = 18.dp),
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 effect.params.forEachIndexed { i, p ->
@@ -563,11 +563,11 @@ private fun ToolPanel(
         Box(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = 16.dp)
                 .height(1.dp)
                 .background(colors.stroke),
         )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         CategoryRow(selected = category, onSelect = onSelectCategory)
         Spacer(Modifier.height(12.dp))
         EffectRow(category = category, selected = effect, onSelect = onSelectEffect)
@@ -581,7 +581,7 @@ private fun CategoryRow(selected: EffectCategory, onSelect: (EffectCategory) -> 
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         EffectRepository.categories.forEach { cat ->
@@ -589,9 +589,9 @@ private fun CategoryRow(selected: EffectCategory, onSelect: (EffectCategory) -> 
             val dot = categoryColor(cat, colors)
             Column(
                 Modifier
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .clickableNoRipple { onSelect(cat) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -600,7 +600,7 @@ private fun CategoryRow(selected: EffectCategory, onSelect: (EffectCategory) -> 
                     color = if (isSel) colors.textHigh else colors.textLow,
                     fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 // Selected category gets a coloured underline indicator; others a gap.
                 Box(
                     Modifier
@@ -624,7 +624,7 @@ private fun EffectRow(
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         EffectRepository.inCategory(category).forEach { fx ->
@@ -642,7 +642,7 @@ private fun EffectRow(
                         RoundedCornerShape(12.dp),
                     )
                     .clickableNoRipple { onSelect(fx) }
-                    .padding(horizontal = 9.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 // Selected tile carries a small accent dot top-left for a strong state.
                 if (isSel) {
@@ -693,7 +693,7 @@ private fun ExportSheet(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 20.dp)
+                .padding(top = 12.dp, bottom = 20.dp)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
             // Grab handle to match the panel's sheet language.
@@ -715,12 +715,12 @@ private fun ExportSheet(
                         color = colors.textLow,
                     )
                 }
-                CircleIconButton(Icons.Rounded.Close, "Close", onDismiss, size = 36.dp)
+                CircleIconButton(Icons.Rounded.Close, "Close", onDismiss, size = 44.dp)
             }
             Spacer(Modifier.height(20.dp))
 
             Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = colors.textLow)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             val formats = ExportFormat.entries
             SegmentedControl(
                 options = formats.map { it.label },
@@ -729,7 +729,7 @@ private fun ExportSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(24.dp))
 
             if (state.exportFormat.animated) {
                 GlitchSlider(
@@ -769,8 +769,8 @@ private fun ExportSheet(
                 )
             }
 
-            Spacer(Modifier.height(26.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExportButton("Share", Icons.Rounded.Share, filled = false, modifier = Modifier.weight(1f)) {
                     onShare(); onDismiss()
                 }
@@ -793,13 +793,13 @@ private fun ExportButton(
     val colors = GlitchTheme.colors
     Row(
         modifier
-            .clip(RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(if (filled) colors.accent else colors.panelElevated)
             .then(
-                if (filled) Modifier else Modifier.border(1.dp, colors.stroke, RoundedCornerShape(13.dp))
+                if (filled) Modifier else Modifier.border(1.dp, colors.stroke, RoundedCornerShape(12.dp))
             )
             .clickableNoRipple { onClick() }
-            .padding(vertical = 15.dp),
+            .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -840,7 +840,7 @@ private fun ExportOverlay(progress: Float, isAnimated: Boolean) {
                 .clip(RoundedCornerShape(18.dp))
                 .background(colors.panel)
                 .border(1.dp, colors.stroke, RoundedCornerShape(18.dp))
-                .padding(horizontal = 28.dp, vertical = 26.dp),
+                .padding(horizontal = 28.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (isAnimated) {
@@ -865,7 +865,7 @@ private fun ExportOverlay(progress: Float, isAnimated: Boolean) {
                             )
                         },
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "${(animatedProgress * 100).roundToInt()}%",
                     style = MaterialTheme.typography.labelLarge,

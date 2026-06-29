@@ -105,11 +105,11 @@ fun GlitchSlider(
             Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = colors.textMed)
             Text(valueText, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = colors.textHigh)
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(26.dp)
+                .height(44.dp)
                 .onSizeChanged { trackWidth = it.width.toFloat().coerceAtLeast(1f) }
                 .pointerInput(valueRange) {
                     detectHorizontalDragGestures { change, _ ->
@@ -163,8 +163,8 @@ fun SegmentedControl(
             .clip(RoundedCornerShape(10.dp))
             .background(colors.panel)
             .border(1.dp, colors.stroke, RoundedCornerShape(10.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
@@ -174,7 +174,7 @@ fun SegmentedControl(
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (selected) colors.panelElevated else Color.Transparent)
                     .clickableNoRipple { onSelect(index) }
-                    .padding(vertical = 9.dp),
+                    .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -197,7 +197,7 @@ fun CircleIconButton(
     modifier: Modifier = Modifier,
     tint: Color = GlitchTheme.colors.textHigh,
     background: Color = GlitchTheme.colors.panel,
-    size: androidx.compose.ui.unit.Dp = 42.dp,
+    size: androidx.compose.ui.unit.Dp = 44.dp,
 ) {
     Box(
         modifier
