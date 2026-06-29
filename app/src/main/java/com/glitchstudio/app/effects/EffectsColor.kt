@@ -1,235 +1,232 @@
 package com.glitchstudio.app.effects
 
-private val C = Categories.COLOR
+import com.glitchstudio.app.effects.EffectCategory.COLOR
 
-val colorEffects: List<Effect> = listOf(
+internal val colorEffects: List<ShaderEffect> = listOf(
 
-    Effect(
-        id = "duotone", name = "Duotone", category = C,
-        params = listOf(
-            EffectParam("Shadow Hue", 0f, 1f, 0.62f),
-            EffectParam("Highlight Hue", 0f, 1f, 0.08f)
+    fx("exposure", "Exposure", COLOR, "Stops of light, like opening the aperture.",
+        listOf(P("Exposure", -3f, 3f, 0f, bipolar = true)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c *= pow(2.0, u_p0);
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("brightness", "Brightness", COLOR, "Uniform lift or drop in luminance.",
+        listOf(P("Amount", -0.5f, 0.5f, 0f, bipolar = true)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb + u_p0;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("contrast", "Contrast", COLOR, "Push tones away from or toward mid-grey.",
+        listOf(P("Contrast", 0f, 2f, 1f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = (c - 0.5) * u_p0 + 0.5;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("saturation", "Saturation", COLOR, "Intensity of all colours at once.",
+        listOf(P("Saturation", 0f, 2f, 1f)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = mix(vec3(luma(c)), c, u_p0);
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("vibrance", "Vibrance", COLOR, "Smart saturation that protects skin tones.",
+        listOf(P("Vibrance", -1f, 1f, 0f, bipolar = true)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            float mx = max(c.r, max(c.g, c.b));
+            float mn = min(c.r, min(c.g, c.b));
+            float sat = mx - mn;
+            c = mix(vec3(luma(c)), c, 1.0 + u_p0 * (1.0 - sat));
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("temperature", "Temperature", COLOR, "Warm the image up or cool it down.",
+        listOf(P("Temp", -0.25f, 0.25f, 0f, bipolar = true)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c.r += u_p0; c.b -= u_p0;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("tint", "Tint", COLOR, "Shift between green and magenta.",
+        listOf(P("Tint", -0.25f, 0.25f, 0f, bipolar = true)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c.g += u_p0; c.r -= u_p0 * 0.5; c.b -= u_p0 * 0.5;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("hue", "Hue Rotate", COLOR, "Spin every colour around the wheel.",
+        listOf(P("Hue", 0f, 1f, 0f)),
+        LIB_HSV + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            vec3 h = rgb2hsv(c);
+            h.x = fract(h.x + u_p0);
+            gl_FragColor = vec4(hsv2rgb(h), 1.0);
+        }
+        """),
+
+    fx("gamma", "Gamma", COLOR, "Bend the tone curve through the mids.",
+        listOf(P("Gamma", 0.2f, 3f, 1f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = pow(max(c, 0.0), vec3(1.0 / u_p0));
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
+
+    fx("hishadow", "Highlights & Shadows", COLOR, "Recover highlights and open shadows.",
+        listOf(
+            P("Highlights", -0.6f, 0.6f, 0f, bipolar = true),
+            P("Shadows", -0.6f, 0.6f, 0f, bipolar = true),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            float l = luma(tex(uv));
-            vec3 a = hsv2rgb(vec3(p0, 0.7, 0.25));
-            vec3 b = hsv2rgb(vec3(p1, 0.6, 1.0));
-            return vec4(mix(a, b, l), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "gradient_map", name = "Gradient Map", category = C,
-        params = listOf(
-            EffectParam("Low Hue", 0f, 1f, 0.0f),
-            EffectParam("High Hue", 0f, 1f, 0.15f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            float l = luma(tex(uv));
-            vec3 a = hsv2rgb(vec3(p0, 0.8, 0.1));
-            vec3 b = hsv2rgb(vec3(p1, 0.9, 1.0));
-            return vec4(mix(a, b, smoothstep(0.0, 1.0, l)), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "hue_rotate", name = "Hue Rotate", category = C,
-        params = listOf(EffectParam("Shift", 0f, 1f, 0.2f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 h = rgb2hsv(tex(uv));
-            h.x = fract(h.x + p0);
-            return vec4(hsv2rgb(h), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "saturation", name = "Saturation", category = C,
-        params = listOf(EffectParam("Amount", 0f, 2f, 1.3f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
             float l = luma(c);
-            return vec4(clamp(mix(vec3(l), c, p0), 0.0, 1.0), 1.0);
-        }"""
-    ),
+            c += u_p0 * smoothstep(0.5, 1.0, l);
+            c += u_p1 * (1.0 - smoothstep(0.0, 0.5, l));
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
 
-    Effect(
-        id = "contrast", name = "Contrast", category = C,
-        params = listOf(
-            EffectParam("Contrast", 0f, 2f, 1.2f),
-            EffectParam("Brightness", -0.5f, 0.5f, 0.0f)
+    fx("levels", "Black & White Point", COLOR, "Clip the histogram for punch.",
+        listOf(
+            P("Blacks", 0f, 0.45f, 0f),
+            P("Whites", 0.55f, 1f, 1f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = (tex(uv) - 0.5) * p0 + 0.5 + p1;
-            return vec4(clamp(c, 0.0, 1.0), 1.0);
-        }"""
-    ),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = (c - u_p0) / max(0.001, (u_p1 - u_p0));
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
 
-    Effect(
-        id = "temperature", name = "Temperature", category = C,
-        params = listOf(
-            EffectParam("Warmth", -1f, 1f, 0.25f),
-            EffectParam("Tint", -1f, 1f, 0.0f)
+    fx("invert", "Invert", COLOR, "Photographic negative.",
+        listOf(P("Amount", 0f, 1f, 1f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            gl_FragColor = vec4(mix(c, 1.0 - c, u_p0), 1.0);
+        }
+        """),
+
+    fx("sepia", "Sepia", COLOR, "Warm monochrome of old prints.",
+        listOf(P("Amount", 0f, 1f, 1f)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            vec3 s = vec3(luma(c)) * vec3(1.07, 0.74, 0.43);
+            gl_FragColor = vec4(mix(c, s, u_p0), 1.0);
+        }
+        """),
+
+    fx("grayscale", "Grayscale", COLOR, "Desaturate to neutral black and white.",
+        listOf(P("Amount", 0f, 1f, 1f)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            gl_FragColor = vec4(mix(c, vec3(luma(c)), u_p0), 1.0);
+        }
+        """),
+
+    fx("duotone", "Duotone", COLOR, "Map shadows and highlights to two hues.",
+        listOf(
+            P("Shadow Hue", 0f, 1f, 0.62f),
+            P("Light Hue", 0f, 1f, 0.08f),
+            P("Amount", 0f, 1f, 1f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            c.r += p0 * 0.15; c.b -= p0 * 0.15;
-            c.g += p1 * 0.15;
-            return vec4(clamp(c, 0.0, 1.0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "sepia", name = "Sepia", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 1f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            vec3 s = vec3(dot(c, vec3(0.393, 0.769, 0.189)),
-                          dot(c, vec3(0.349, 0.686, 0.168)),
-                          dot(c, vec3(0.272, 0.534, 0.131)));
-            return vec4(mix(c, clamp(s, 0.0, 1.0), p0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "grayscale", name = "Grayscale", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 1f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            return vec4(mix(c, vec3(luma(c)), p0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "invert", name = "Invert", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 1f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            return vec4(mix(c, 1.0 - c, p0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "solarize", name = "Solarize", category = C,
-        params = listOf(EffectParam("Threshold", 0f, 1f, 0.5f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            return vec4(mix(c, 1.0 - c, step(p0, c)), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "thermal", name = "Thermal", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 1f)),
-        body = """
-        vec4 process(vec2 uv) {
-            float l = luma(tex(uv));
-            vec3 col = hsv2rgb(vec3((1.0 - l) * 0.7, 1.0, 1.0));
-            return vec4(mix(tex(uv), col, p0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "night_vision", name = "Night Vision", category = C, animated = true,
-        params = listOf(
-            EffectParam("Amount", 0f, 1f, 1f),
-            EffectParam("Noise", 0f, 1f, 0.3f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            float l = luma(tex(uv));
-            float n = hash21(uv * uResolution + uTime * 60.0) * p1;
-            l = l * 1.4 + n * 0.2;
-            l *= 0.85 + 0.15 * sin(uv.y * uResolution.y * 1.5);
-            float v = 1.0 - dot(uv - 0.5, uv - 0.5) * 1.2;
-            vec3 col = vec3(0.1, l, 0.1) * v;
-            return vec4(mix(tex(uv), col, p0), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "predator", name = "Predator", category = C,
-        params = listOf(EffectParam("Bands", 3f, 12f, 6f)),
-        body = """
-        vec4 process(vec2 uv) {
-            float l = luma(tex(uv));
-            float q = floor(l * p0) / p0;
-            return vec4(hsv2rgb(vec3((1.0 - q) * 0.75, 1.0, 1.0)), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "teal_orange", name = "Teal & Orange", category = C,
-        params = listOf(EffectParam("Strength", 0f, 1f, 0.6f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
+        LIB_LUMA + LIB_HSV + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
             float l = luma(c);
-            vec3 shadow = vec3(0.0, 0.3, 0.4);
-            vec3 high = vec3(1.0, 0.6, 0.2);
-            vec3 grade = mix(c, mix(shadow, high, l), p0 * 0.6);
-            return vec4(clamp(grade, 0.0, 1.0), 1.0);
-        }"""
-    ),
+            vec3 a = hsv2rgb(vec3(u_p0, 0.7, 0.18));
+            vec3 b = hsv2rgb(vec3(u_p1, 0.55, 1.0));
+            vec3 d = mix(a, b, l);
+            gl_FragColor = vec4(mix(c, d, u_p2), 1.0);
+        }
+        """),
 
-    Effect(
-        id = "bleach_bypass", name = "Bleach Bypass", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 0.7f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            float l = luma(c);
-            vec3 b = mix(c * l * 2.0, 1.0 - 2.0 * (1.0 - c) * (1.0 - l), step(0.5, l));
-            return vec4(clamp(mix(c, b, p0), 0.0, 1.0), 1.0);
-        }"""
-    ),
+    fx("posterize", "Posterize", COLOR, "Quantise tones into flat bands.",
+        listOf(P("Levels", 2f, 16f, 6f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            float n = max(2.0, floor(u_p0));
+            c = floor(c * n) / (n - 1.0);
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
 
-    Effect(
-        id = "cross_process", name = "Cross Process", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 0.7f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            vec3 x = c;
-            x.r = smoothstep(0.0, 1.0, x.r);
-            x.g = pow(x.g, 0.9);
-            x.b = x.b * 0.8 + 0.1;
-            return vec4(clamp(mix(c, x, p0), 0.0, 1.0), 1.0);
-        }"""
-    ),
+    fx("threshold", "Threshold", COLOR, "Hard cut to pure black and white.",
+        listOf(P("Level", 0f, 1f, 0.5f)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            gl_FragColor = vec4(vec3(step(u_p0, luma(c))), 1.0);
+        }
+        """),
 
-    Effect(
-        id = "technicolor", name = "Technicolor", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 0.8f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            vec3 t;
-            t.r = c.r - (c.g + c.b) * 0.3 + 0.3;
-            t.g = c.g - (c.r + c.b) * 0.3 + 0.3;
-            t.b = c.b - (c.r + c.g) * 0.3 + 0.3;
-            return vec4(clamp(mix(c, t, p0), 0.0, 1.0), 1.0);
-        }"""
-    ),
+    fx("solarize", "Solarize", COLOR, "Invert tones past a threshold (Sabattier).",
+        listOf(P("Level", 0f, 1f, 0.5f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = mix(c, 1.0 - c, step(u_p0, c));
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
 
-    Effect(
-        id = "infrared", name = "Infrared", category = C,
-        params = listOf(EffectParam("Amount", 0f, 1f, 1f)),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            vec3 ir = vec3(c.g, c.b, c.r);
-            ir.r = 1.0 - ir.r * 0.5;
-            return vec4(mix(c, clamp(ir, 0.0, 1.0), p0), 1.0);
-        }"""
-    )
+    fx("fade", "Vintage Fade", COLOR, "Lifted blacks and gentle desaturation.",
+        listOf(P("Amount", 0f, 1f, 0.6f)),
+        LIB_LUMA + """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            c = c * (1.0 - u_p0 * 0.25) + u_p0 * 0.12;
+            c = mix(c, vec3(luma(c)), u_p0 * 0.2);
+            c.r += u_p0 * 0.03; c.b -= u_p0 * 0.02;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
+
+    fx("clarity", "Clarity", COLOR, "Local contrast that adds midtone bite.",
+        listOf(P("Clarity", -1f, 1f, 0.35f, bipolar = true)),
+        """
+        void main(){
+            vec2 px = 2.0 / u_Resolution;
+            vec2 uv = v_TexCoord;
+            vec3 c = texture2D(u_Texture, uv).rgb;
+            vec3 b = c;
+            b += texture2D(u_Texture, uv + vec2(px.x, 0.0)).rgb;
+            b += texture2D(u_Texture, uv - vec2(px.x, 0.0)).rgb;
+            b += texture2D(u_Texture, uv + vec2(0.0, px.y)).rgb;
+            b += texture2D(u_Texture, uv - vec2(0.0, px.y)).rgb;
+            b /= 5.0;
+            c += (c - b) * u_p0 * 3.0;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }
+        """),
 )

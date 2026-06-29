@@ -1,20 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Glitch / RGB-shift mark: three offset rounded bars -->
-    <group android:translateX="0" android:translateY="0">
+    <!-- RGB-split lens motif: three offset rings evoking chromatic aberration. -->
+    <group android:scaleX="0.92" android:scaleY="0.92" android:pivotX="54" android:pivotY="54">
         <path
-            android:fillColor="#FF2DE2E6"
-            android:fillAlpha="0.9"
-            android:pathData="M34,34 h44 a6,6 0 0 1 6,6 v8 a6,6 0 0 1 -6,6 h-44 a6,6 0 0 1 -6,-6 v-8 a6,6 0 0 1 6,-6 z" />
+            android:pathData="M27,54 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0"
+            android:strokeColor="#FFFF2D6B"
+            android:strokeWidth="4.5"
+            android:strokeAlpha="0.92"
+            android:fillColor="#00000000" />
         <path
-            android:fillColor="#FFFF3DCB"
-            android:fillAlpha="0.9"
-            android:pathData="M30,50 h44 a6,6 0 0 1 6,6 v8 a6,6 0 0 1 -6,6 h-44 a6,6 0 0 1 -6,-6 v-8 a6,6 0 0 1 6,-6 z" />
+            android:pathData="M32,54 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0"
+            android:strokeColor="#FF34F5C5"
+            android:strokeWidth="4.5"
+            android:strokeAlpha="0.92"
+            android:fillColor="#00000000" />
         <path
-            android:fillColor="#FFF5F5FA"
-            android:pathData="M38,66 h32 a6,6 0 0 1 6,6 v6 a6,6 0 0 1 -6,6 h-32 a6,6 0 0 1 -6,-6 v-6 a6,6 0 0 1 6,-6 z" />
+            android:pathData="M37,54 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0"
+            android:strokeColor="#FF4D7CFF"
+            android:strokeWidth="4.5"
+            android:strokeAlpha="0.92"
+            android:fillColor="#00000000" />
+        <path
+            android:pathData="M54,49 a5,5 0 1,0 0.1,0 z"
+            android:fillColor="#FFFFFFFF"
+            android:fillAlpha="0.95" />
     </group>
 </vector>

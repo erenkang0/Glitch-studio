@@ -1,776 +1,885 @@
 package com.glitchstudio.app.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Brush
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import com.glitchstudio.app.effects.Categories
-import com.glitchstudio.app.effects.Effect
-import com.glitchstudio.app.effects.EffectRegistry
+import com.glitchstudio.app.effects.EffectCategory
+import com.glitchstudio.app.effects.EffectRepository
+import com.glitchstudio.app.effects.ParamRole
+import com.glitchstudio.app.effects.ShaderEffect
 import com.glitchstudio.app.export.ExportFormat
-import com.glitchstudio.app.gl.GlPhotoView
-import com.glitchstudio.app.gl.MaskType
-import com.glitchstudio.app.ui.components.GhostIconButton
-import com.glitchstudio.app.ui.components.GlitchChip
-import com.glitchstudio.app.ui.components.GradientButton
-import com.glitchstudio.app.ui.components.LabeledSlider
-import com.glitchstudio.app.ui.components.SegmentedTabs
+import com.glitchstudio.app.gl.GLPreviewView
+import com.glitchstudio.app.ui.components.CircleIconButton
+import com.glitchstudio.app.ui.components.GlitchSlider
+import com.glitchstudio.app.ui.components.SegmentedControl
 import com.glitchstudio.app.ui.theme.GlitchColors
-import kotlinx.coroutines.launch
+import com.glitchstudio.app.ui.theme.GlitchTheme
+import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.roundToInt
 
-private val RAIL_HEIGHT = 70.dp
-
 @Composable
-fun EditorScreen(vm: EditorViewModel) {
+fun EditorScreen(
+    viewModel: EditorViewModel,
+    onPickNewImage: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val state by viewModel.state.collectAsState()
+    val preview by viewModel.preview.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var glView by remember { mutableStateOf<GlPhotoView?>(null) }
-    var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var showExport by remember { mutableStateOf(false) }
 
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) scope.launch {
-            ImageLoader.load(context, uri)?.let { bmp ->
-                imageBitmap = bmp
-                glView?.setImage(bmp)
-                vm.onImageLoaded(bmp.width, bmp.height)
-            }
+    LaunchedEffect(state.message) {
+        state.message?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.consumeMessage()
         }
     }
-    fun pick() = picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
-    LaunchedEffect(glView) {
-        val v = glView ?: return@LaunchedEffect
-        snapshotFlow { vm.revision }.collect { v.setLayers(vm.renderLayers()) }
-    }
-    LaunchedEffect(glView) {
-        val v = glView ?: return@LaunchedEffect
-        snapshotFlow { vm.continuousRender }.collect { v.setContinuous(it) }
-    }
-    LaunchedEffect(glView) {
-        val v = glView ?: return@LaunchedEffect
-        snapshotFlow { Triple(vm.viewScale, vm.viewPanX, vm.viewPanY) }
-            .collect { v.setViewTransform(it.first, it.second, it.third) }
-    }
-    LaunchedEffect(glView, imageBitmap) {
-        imageBitmap?.let {
-            glView?.setImage(it)
-            glView?.setLayers(vm.renderLayers())
-            glView?.setContinuous(vm.continuousRender)
-        }
-    }
-    // Generate the missing thumbnails for the visible category.
-    LaunchedEffect(glView, imageBitmap, vm.category) {
-        val v = glView ?: return@LaunchedEffect
-        if (imageBitmap == null) return@LaunchedEffect
-        val missing = EffectRegistry.inCategory(vm.category).filter { it.id !in vm.thumbnails }
-        if (missing.isNotEmpty()) v.renderThumbnails(missing, 160) { id, b -> vm.putThumbnail(id, b) }
-    }
-
-    Box(Modifier.fillMaxSize().background(GlitchColors.background)) {
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            TopBar(
-                hasImage = vm.hasImage,
-                showPlay = vm.hasAnimatedLayer,
-                playing = vm.playing,
-                onPlayToggle = { vm.togglePlaying() },
-                onImport = { pick() },
-                onExport = { vm.showExport = true }
-            )
-
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (vm.hasImage) {
-                    CanvasWithPanel(vm, imageBitmap, glView, onReady = { glView = it })
-                } else {
-                    EmptyState(onImport = { pick() })
-                }
-            }
-
-            if (vm.hasImage) CategoryRail(vm)
-        }
-
-        AnimatedVisibility(
-            visible = vm.showExport,
-            enter = fadeIn(tween(180)),
-            exit = fadeOut(tween(180))
-        ) {
-            ExportSheet(vm, glView)
-        }
-    }
-}
-
-// --- canvas ----------------------------------------------------------------
-
-/** Wraps the canvas and the slide-up tool panel in a dedicated Box so the panel's
- *  AnimatedVisibility resolves unambiguously (no enclosing ColumnScope). */
-@Composable
-private fun CanvasWithPanel(
-    vm: EditorViewModel,
-    imageBitmap: Bitmap?,
-    glView: GlPhotoView?,
-    onReady: (GlPhotoView) -> Unit
-) {
-    Box(Modifier.fillMaxSize()) {
-        CanvasArea(vm, imageBitmap, glView, onReady)
-        AnimatedVisibility(
-            visible = vm.panelOpen,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
-            exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(200))
-        ) {
-            PanelCard(vm, glView, imageBitmap)
-        }
-    }
-}
-
-@Composable
-private fun CanvasArea(
-    vm: EditorViewModel,
-    imageBitmap: Bitmap?,
-    glView: GlPhotoView?,
-    onReady: (GlPhotoView) -> Unit
-) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val haptics = rememberHaptics()
-    var view by remember { mutableStateOf<GlPhotoView?>(null) }
-    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-
-    DisposableEffect(lifecycleOwner, view) {
-        val v = view
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> v?.onResume()
-                Lifecycle.Event.ON_PAUSE -> v?.onPause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val painting = vm.maskEditing && vm.selected?.maskType == MaskType.BRUSH && imageBitmap != null
-
-    Box(Modifier.fillMaxSize().padding(8.dp)) {
-        AndroidView(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(20.dp))
-                .onSizeChanged { canvasSize = it }
-                .then(
-                    if (painting) Modifier
-                    else Modifier
-                        .pointerInput(canvasSize) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                vm.applyTransform(zoom, pan.x, pan.y, canvasSize.width.toFloat(), canvasSize.height.toFloat())
-                            }
-                        }
-                        .pointerInput(Unit) {
-                            detectTapGestures(onDoubleTap = { vm.resetZoom() })
-                        }
-                ),
-            factory = { ctx -> GlPhotoView(ctx).also { view = it; onReady(it) } }
-        )
-
-        if (painting) {
-            val imgW = imageBitmap!!.width.toFloat()
-            val imgH = imageBitmap.height.toFloat()
-            Box(
-                Modifier.fillMaxSize().pointerInput(vm.selected?.id, canvasSize, imgW, imgH) {
-                    var last = androidx.compose.ui.geometry.Offset.Zero
-                    detectDragGestures(
-                        onDragStart = { pos ->
-                            last = pos
-                            val uv = toUv(pos, canvasSize, imgW, imgH)
-                            vm.paintMaskStroke(uv.x, uv.y, uv.x, uv.y)
-                        },
-                        onDrag = { change, _ ->
-                            val a = toUv(last, canvasSize, imgW, imgH)
-                            val b = toUv(change.position, canvasSize, imgW, imgH)
-                            vm.paintMaskStroke(a.x, a.y, b.x, b.y)
-                            last = change.position
-                        }
-                    )
-                }
-            )
-        }
-
-        Box(Modifier.fillMaxSize().border(1.dp, if (painting) GlitchColors.accent else GlitchColors.border, RoundedCornerShape(20.dp)))
-
-        // Zoom indicator
-        if (vm.viewScale > 1.01f && !painting) {
-            Pill(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
-                Text("${vm.viewScale.roundToInt()}x", color = GlitchColors.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        if (painting) {
-            Pill(Modifier.align(Alignment.BottomCenter).padding(10.dp), border = GlitchColors.accent) {
-                Text(
-                    if (vm.selected?.brushErase == true) "Erasing — drag on photo" else "Painting — drag on photo",
-                    color = GlitchColors.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
-                )
-            }
-        } else if (!vm.panelOpen) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(10.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xCC15151D))
-                    .border(1.dp, GlitchColors.border, RoundedCornerShape(14.dp))
-                    .pointerInput(glView) {
-                        detectTapGestures(onPress = {
-                            haptics.click(); glView?.setBypass(true); tryAwaitRelease(); glView?.setBypass(false)
-                        })
-                    }
-                    .padding(horizontal = 12.dp, vertical = 9.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Visibility, null, tint = GlitchColors.textSecondary, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Hold: original", color = GlitchColors.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Pill(modifier: Modifier = Modifier, border: Color = GlitchColors.border, content: @Composable () -> Unit) {
     Box(
         modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xCC15151D))
-            .border(1.dp, border, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 7.dp)
-    ) { content() }
+            .fillMaxSize()
+            .background(GlitchTheme.colors.backdrop)
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            EditorTopBar(
+                effectName = state.effect.name,
+                category = state.effect.category,
+                onBack = onBack,
+                onCompareChanged = viewModel::setCompare,
+                onExport = { showExport = true },
+            )
+            EffectCanvas(
+                preview = preview,
+                effect = state.effect,
+                values = state.values,
+                compare = state.compare,
+                onSetValue = viewModel::setValue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+            ToolPanel(
+                effect = state.effect,
+                values = state.values,
+                category = state.category,
+                onSetValue = viewModel::setValue,
+                onResetParam = { i -> viewModel.setValue(i, state.effect.params[i].default) },
+                onResetAll = viewModel::resetValues,
+                onSelectCategory = viewModel::selectCategory,
+                onSelectEffect = viewModel::selectEffect,
+            )
+        }
+
+        if (state.isExporting) {
+            ExportOverlay(progress = state.exportProgress, isAnimated = state.exportFormat.animated)
+        }
+    }
+
+    if (showExport) {
+        ExportSheet(
+            state = state,
+            onDismiss = { showExport = false },
+            onFormat = viewModel::setExportFormat,
+            onQuality = viewModel::setQuality,
+            onFrames = viewModel::setGifFrames,
+            onFps = viewModel::setGifFps,
+            onSave = { viewModel.export(share = false) {} },
+            onShare = {
+                viewModel.export(share = true) { uri ->
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = state.exportFormat.mime
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share"))
+                }
+            },
+        )
+    }
 }
 
-private fun toUv(
-    pos: androidx.compose.ui.geometry.Offset,
-    size: IntSize,
-    imgW: Float,
-    imgH: Float
-): androidx.compose.ui.geometry.Offset {
-    if (size.width == 0 || size.height == 0) return androidx.compose.ui.geometry.Offset(0.5f, 0.5f)
-    val sw = size.width.toFloat(); val sh = size.height.toFloat()
-    val imgA = imgW / imgH; val viewA = sw / sh
-    val rw: Float; val rh: Float
-    if (imgA > viewA) { rw = sw; rh = sw / imgA } else { rh = sh; rw = sh * imgA }
-    val ox = (sw - rw) / 2f; val oy = (sh - rh) / 2f
-    return androidx.compose.ui.geometry.Offset(
-        ((pos.x - ox) / rw).coerceIn(0f, 1f),
-        ((pos.y - oy) / rh).coerceIn(0f, 1f)
+// --- Top bar -----------------------------------------------------------------
+
+@Composable
+private fun EditorTopBar(
+    effectName: String,
+    category: EffectCategory,
+    onBack: () -> Unit,
+    onCompareChanged: (Boolean) -> Unit,
+    onExport: () -> Unit,
+) {
+    val colors = GlitchTheme.colors
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                // Hairline rule that grounds the bar against the canvas below.
+                val y = size.height - 0.5.dp.toPx()
+                drawLine(colors.stroke, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+            }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CircleIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onBack)
+            Spacer(Modifier.weight(1f))
+            // Press and hold to compare with the original.
+            CompareButton(onCompareChanged)
+            Spacer(Modifier.width(12.dp))
+            CircleIconButton(
+                Icons.Rounded.FileDownload, "Export", onExport,
+                background = colors.accent, tint = Color.White,
+            )
+        }
+        // Centred title block with a category eyebrow above the active effect name.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                category.label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textLow,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                effectName,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.textHigh,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompareButton(onCompareChanged: (Boolean) -> Unit) {
+    val colors = GlitchTheme.colors
+    var held by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(if (held) colors.panelElevated else colors.panel)
+            .then(
+                if (held) Modifier.border(1.dp, colors.strokeStrong, CircleShape) else Modifier
+            )
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown()
+                    held = true
+                    onCompareChanged(true)
+                    waitForUpOrCancellation()
+                    onCompareChanged(false)
+                    held = false
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.Visibility,
+            "Hold to compare",
+            tint = if (held) colors.textHigh else colors.textMed,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+// --- Canvas with on-image finger control -------------------------------------
+
+@Composable
+private fun EffectCanvas(
+    preview: Bitmap?,
+    effect: ShaderEffect,
+    values: List<Float>,
+    compare: Boolean,
+    onSetValue: (Int, Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = GlitchTheme.colors
+    Box(modifier.padding(horizontal = 16.dp, vertical = 16.dp), contentAlignment = Alignment.Center) {
+        if (preview == null) {
+            CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(28.dp))
+            return@Box
+        }
+        val aspect = remember(preview) { preview.width.toFloat() / preview.height.toFloat() }
+        val lastBmp = remember { mutableStateOf<Bitmap?>(null) }
+        val lastEffectId = remember { mutableStateOf<String?>(null) }
+        val latest = rememberUpdatedState(EffectCanvasState(effect, values))
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(aspect)
+                .clip(RoundedCornerShape(10.dp))
+                // A faint frame separates the photo from the dark chrome without
+                // tinting it — the image stays the hero.
+                .border(1.dp, colors.stroke, RoundedCornerShape(10.dp)),
+        ) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                modifier = Modifier.matchParentSize(),
+                factory = { ctx -> GLPreviewView(ctx) },
+                update = { view ->
+                    if (preview !== lastBmp.value) {
+                        view.setImage(preview)
+                        lastBmp.value = preview
+                    }
+                    if (effect.id != lastEffectId.value) {
+                        view.setEffect(effect)
+                        lastEffectId.value = effect.id
+                    }
+                    view.setValues(values.toFloatArray())
+                    view.setBypass(compare)
+                },
+            )
+
+            // Gesture + handle overlay layer.
+            Canvas(
+                Modifier
+                    .matchParentSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, drag ->
+                            change.consume()
+                            val cur = latest.value
+                            val w = size.width.toFloat().coerceAtLeast(1f)
+                            val h = size.height.toFloat().coerceAtLeast(1f)
+                            applyCanvasDrag(cur, change.position.x, change.position.y, drag.x, drag.y, w, h, onSetValue)
+                        }
+                    },
+            ) {
+                if (compare) return@Canvas
+                drawCanvasHandles(effect, values, colors.accent)
+            }
+
+            // While holding to compare, label the original so the swap is legible.
+            if (compare) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "ORIGINAL",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class EffectCanvasState(val effect: ShaderEffect, val values: List<Float>)
+
+private fun applyCanvasDrag(
+    cur: EffectCanvasState,
+    px: Float,
+    py: Float,
+    dx: Float,
+    dy: Float,
+    w: Float,
+    h: Float,
+    onSetValue: (Int, Float) -> Unit,
+) {
+    val params = cur.effect.params
+    val posX = params.indexOfFirst { it.role == ParamRole.POS_X }
+    val posY = params.indexOfFirst { it.role == ParamRole.POS_Y }
+    val angleIdx = params.indexOfFirst { it.role == ParamRole.ANGLE }
+    when {
+        posX >= 0 && posY >= 0 -> {
+            onSetValue(posX, mapFraction(params[posX], (px / w).coerceIn(0f, 1f)))
+            onSetValue(posY, mapFraction(params[posY], (py / h).coerceIn(0f, 1f)))
+        }
+        angleIdx >= 0 -> {
+            var ang = atan2((py - h / 2f), (px - w / 2f)) / (2f * PI.toFloat())
+            ang -= kotlin.math.floor(ang)
+            onSetValue(angleIdx, mapFraction(params[angleIdx], ang))
+        }
+        else -> {
+            if (params.isNotEmpty()) {
+                val p = params[0]
+                val v = cur.values.getOrElse(0) { p.default } + dx / w * (p.max - p.min)
+                onSetValue(0, v.coerceIn(p.min, p.max))
+            }
+            if (params.size > 1) {
+                val p = params[1]
+                val v = cur.values.getOrElse(1) { p.default } - dy / h * (p.max - p.min)
+                onSetValue(1, v.coerceIn(p.min, p.max))
+            }
+        }
+    }
+}
+
+private fun mapFraction(p: com.glitchstudio.app.effects.ShaderParam, frac: Float): Float =
+    p.min + frac.coerceIn(0f, 1f) * (p.max - p.min)
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCanvasHandles(
+    effect: ShaderEffect,
+    values: List<Float>,
+    accent: Color,
+) {
+    val params = effect.params
+    val posX = params.indexOfFirst { it.role == ParamRole.POS_X }
+    val posY = params.indexOfFirst { it.role == ParamRole.POS_Y }
+    val angleIdx = params.indexOfFirst { it.role == ParamRole.ANGLE }
+    if (posX >= 0 && posY >= 0) {
+        val fx = fractionOf(params[posX], values.getOrElse(posX) { params[posX].default }) * size.width
+        val fy = fractionOf(params[posY], values.getOrElse(posY) { params[posY].default }) * size.height
+        val c = Offset(fx, fy)
+        drawCircle(Color.White, radius = 13.dp.toPx(), center = c, style = Stroke(2.5.dp.toPx()))
+        drawCircle(accent, radius = 4.dp.toPx(), center = c)
+    } else if (angleIdx >= 0) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val frac = fractionOf(params[angleIdx], values.getOrElse(angleIdx) { params[angleIdx].default })
+        val a = frac * 2f * PI.toFloat()
+        val r = size.minDimension * 0.3f
+        val tip = Offset(center.x + kotlin.math.cos(a) * r, center.y + kotlin.math.sin(a) * r)
+        drawLine(Color.White, center, tip, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        drawCircle(accent, radius = 5.dp.toPx(), center = tip)
+        drawCircle(Color.White, radius = 3.dp.toPx(), center = center)
+    }
+}
+
+private fun fractionOf(p: com.glitchstudio.app.effects.ShaderParam, v: Float): Float {
+    val span = (p.max - p.min)
+    return if (span <= 0f) 0f else ((v - p.min) / span).coerceIn(0f, 1f)
+}
+
+// --- Tool panel: advanced settings + effect browser --------------------------
+
+/**
+ * A restrained, per-category accent used only as a small colour dot so the chrome
+ * stays neutral while groups stay glanceable (matches the brand RGB-split palette).
+ */
+private fun categoryColor(category: EffectCategory, colors: GlitchColors): Color = when (category) {
+    EffectCategory.COLOR -> colors.accent
+    EffectCategory.LIGHT -> colors.accentAmber
+    EffectCategory.STYLIZE -> colors.accentPurple
+    EffectCategory.DISTORT -> colors.accentTeal
+    EffectCategory.GLITCH -> colors.accentPink
+    EffectCategory.BLUR -> colors.accentBright
+    EffectCategory.TEXTURE -> colors.accentTeal
+    EffectCategory.RETRO -> colors.accentAmber
+}
+
+/** Small uppercase eyebrow label that opens a panel section. */
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = GlitchTheme.colors.textLow,
+        modifier = modifier,
     )
 }
 
-// --- top bar + rail --------------------------------------------------------
-
 @Composable
-private fun TopBar(
-    hasImage: Boolean,
-    showPlay: Boolean,
-    playing: Boolean,
-    onPlayToggle: () -> Unit,
-    onImport: () -> Unit,
-    onExport: () -> Unit
+private fun ToolPanel(
+    effect: ShaderEffect,
+    values: List<Float>,
+    category: EffectCategory,
+    onSetValue: (Int, Float) -> Unit,
+    onResetParam: (Int) -> Unit,
+    onResetAll: () -> Unit,
+    onSelectCategory: (EffectCategory) -> Unit,
+    onSelectEffect: (ShaderEffect) -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(26.dp).clip(RoundedCornerShape(8.dp)).background(GlitchColors.brand))
-        Spacer(Modifier.width(9.dp))
-        Column {
-            Text("Glitch Studio", color = GlitchColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text("${EffectRegistry.creativeCount} effects", color = GlitchColors.textMuted, fontSize = 10.sp)
-        }
-        Spacer(Modifier.weight(1f))
-        if (showPlay) {
-            GhostIconButton(
-                if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play", onPlayToggle, active = playing
+    val colors = GlitchTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(colors.panel)
+            .border(
+                1.dp, colors.stroke,
+                RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             )
-            Spacer(Modifier.width(8.dp))
-        }
-        GhostIconButton(Icons.Rounded.Image, "Import", onImport)
-        if (hasImage) {
-            Spacer(Modifier.width(8.dp))
-            GradientButton("Export", Icons.Rounded.IosShare, onExport)
-        }
-    }
-}
-
-@Composable
-private fun CategoryRail(vm: EditorViewModel) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(RAIL_HEIGHT)
-            .background(GlitchColors.surface)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(bottom = 12.dp),
     ) {
-        PanelTab.entries.forEach { tab ->
-            val active = vm.panelOpen && vm.panelTab == tab
-            Box(Modifier.weight(1f)) {
-                GlitchChip(
-                    label = tab.label,
-                    selected = active,
-                    onClick = { vm.togglePanel(tab) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(onImport: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+        // Grab handle hints the sheet-like nature of the panel.
         Box(
-            Modifier.size(100.dp).clip(RoundedCornerShape(34.dp)).background(GlitchColors.surfaceHigh)
-                .border(1.dp, GlitchColors.border, RoundedCornerShape(34.dp)),
-            contentAlignment = Alignment.Center
-        ) { Icon(Icons.Rounded.AutoAwesome, null, tint = GlitchColors.accent, modifier = Modifier.size(42.dp)) }
-        Spacer(Modifier.height(24.dp))
-        Text("Create something glitchy", color = GlitchColors.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Import a photo and stack ${EffectRegistry.creativeCount} shader effects with layers, masks, zoom and animation.",
-            color = GlitchColors.textSecondary, fontSize = 14.sp, textAlign = TextAlign.Center
+            Modifier
+                .padding(top = 8.dp)
+                .align(Alignment.CenterHorizontally)
+                .size(width = 34.dp, height = 4.dp)
+                .clip(CircleShape)
+                .background(colors.strokeStrong),
         )
-        Spacer(Modifier.height(28.dp))
-        GradientButton("Import a photo", Icons.Rounded.Image, onImport)
+
+        Spacer(Modifier.height(12.dp))
+
+        // Header: effect name + description + reset
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(categoryColor(effect.category, colors)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(effect.name, style = MaterialTheme.typography.titleMedium, color = colors.textHigh)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    effect.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textLow,
+                    maxLines = 1,
+                )
+            }
+            if (effect.params.isNotEmpty()) {
+                Spacer(Modifier.width(12.dp))
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.panelElevated)
+                        .clickableNoRipple { onResetAll() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Refresh, "Reset", tint = colors.textMed, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reset", style = MaterialTheme.typography.labelLarge, color = colors.textMed)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Advanced settings (sliders) for the active effect.
+        if (effect.params.isEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
+                Text(
+                    "This effect has no parameters.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textLow,
+                )
+            }
+        } else {
+            SectionLabel("ADJUST", Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(12.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 224.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                effect.params.forEachIndexed { i, p ->
+                    GlitchSlider(
+                        label = p.name,
+                        value = values.getOrElse(i) { p.default },
+                        valueRange = p.min..p.max,
+                        onValueChange = { onSetValue(i, it) },
+                        bipolar = p.bipolar,
+                        kind = p.kind,
+                        onReset = { onResetParam(i) },
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+        // Hairline separating the active-effect controls from the browser below.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(1.dp)
+                .background(colors.stroke),
+        )
+        Spacer(Modifier.height(16.dp))
+        CategoryRow(selected = category, onSelect = onSelectCategory)
+        Spacer(Modifier.height(12.dp))
+        EffectRow(category = category, selected = effect, onSelect = onSelectEffect)
     }
 }
 
-// --- panel -----------------------------------------------------------------
-
 @Composable
-private fun PanelCard(vm: EditorViewModel, glView: GlPhotoView?, imageBitmap: Bitmap?) {
-    Column(
+private fun CategoryRow(selected: EffectCategory, onSelect: (EffectCategory) -> Unit) {
+    val colors = GlitchTheme.colors
+    Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(GlitchColors.surface)
-            .border(1.dp, GlitchColors.border, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .padding(14.dp)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(vm.panelTab.label, color = GlitchColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-            GhostIconButton(Icons.Rounded.KeyboardArrowDown, "Close", onClick = { vm.closePanel() })
-        }
-        Spacer(Modifier.height(10.dp))
-        AnimatedContent(
-            targetState = vm.panelTab,
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-            label = "panel"
-        ) { tab ->
-            Box(Modifier.heightIn(min = 220.dp, max = 300.dp)) {
-                when (tab) {
-                    PanelTab.EFFECTS -> EffectsPanel(vm, imageBitmap)
-                    PanelTab.ADJUST -> AdjustPanel(vm)
-                    PanelTab.LAYERS -> LayersPanel(vm)
-                    PanelTab.MASK -> MaskPanel(vm)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EffectsPanel(vm: EditorViewModel, imageBitmap: Bitmap?) {
-    Column {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-            items(Categories.ALL) { cat ->
-                GlitchChip(cat, vm.category == cat, onClick = { vm.category = cat })
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        val effects = EffectRegistry.inCategory(vm.category)
-        val activeId = vm.selected?.effect?.id
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            item {
-                EffectCard(
-                    name = "None", category = "Reset", thumb = imageBitmap, animated = false,
-                    selected = activeId == EffectRegistry.original.id,
-                    onClick = { vm.setEffectForSelected(EffectRegistry.original) }
+        EffectRepository.categories.forEach { cat ->
+            val isSel = cat == selected
+            val dot = categoryColor(cat, colors)
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickableNoRipple { onSelect(cat) }
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    cat.label.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSel) colors.textHigh else colors.textLow,
+                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium,
                 )
-            }
-            items(effects) { effect ->
-                EffectCard(
-                    name = effect.name, category = effect.category, thumb = vm.thumbnails[effect.id],
-                    animated = effect.animated, selected = effect.id == activeId,
-                    onClick = { vm.setEffectForSelected(effect) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EffectCard(
-    name: String, category: String, thumb: Bitmap?, animated: Boolean, selected: Boolean, onClick: () -> Unit
-) {
-    val haptics = rememberHaptics()
-    Column(
-        Modifier
-            .width(96.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) GlitchColors.accentSoft else GlitchColors.surfaceHigh)
-            .border(1.dp, if (selected) GlitchColors.accent else GlitchColors.border, RoundedCornerShape(16.dp))
-            .clickable { haptics.click(); onClick() }
-            .padding(8.dp)
-    ) {
-        Box(Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(12.dp)).background(GlitchColors.background)) {
-            if (thumb != null) {
-                androidx.compose.foundation.Image(
-                    thumb.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(Modifier.fillMaxSize().background(GlitchColors.brand))
-            }
-            if (animated) {
-                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xAA000000)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(name, color = GlitchColors.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(category, color = GlitchColors.textMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun AdjustPanel(vm: EditorViewModel) {
-    val layer = vm.selected ?: run { PanelHint("Select a layer to adjust."); return }
-    Column(Modifier.verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(layer.effect.name, color = GlitchColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-            ResetChip { vm.resetSelectedParams() }
-        }
-        Spacer(Modifier.height(6.dp))
-        LabeledSlider("Opacity", layer.opacity, 0f, 1f, onChange = { vm.setOpacity(it) })
-        if (layer.effect.params.isEmpty()) {
-            PanelHint("This effect has no adjustable parameters.")
-        } else {
-            layer.effect.params.forEachIndexed { index, p ->
-                LabeledSlider(p.name, layer.params.getOrElse(index) { p.default }, p.min, p.max, onChange = { vm.updateParam(index, it) })
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-}
-
-@Composable
-private fun ResetChip(onClick: () -> Unit) {
-    val haptics = rememberHaptics()
-    Row(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(GlitchColors.surfaceHigh)
-            .border(1.dp, GlitchColors.border, RoundedCornerShape(10.dp))
-            .clickable { haptics.click(); onClick() }.padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Rounded.Refresh, null, tint = GlitchColors.textSecondary, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(6.dp))
-        Text("Reset", color = GlitchColors.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun LayersPanel(vm: EditorViewModel) {
-    Column {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Layer stack", color = GlitchColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-            GradientButton("Add", Icons.Rounded.Add, onClick = { vm.addLayer() })
-        }
-        Spacer(Modifier.height(10.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            itemsIndexed(vm.layers) { index, layer ->
-                LayerRow(
-                    index = index, name = layer.effect.name, enabled = layer.enabled,
-                    selected = index == vm.selectedIndex, canRemove = vm.layers.size > 1,
-                    onSelect = { vm.selectLayer(index) }, onToggle = { vm.toggleEnabled(index) },
-                    onUp = { if (index < vm.layers.lastIndex) vm.moveLayer(index, index + 1) },
-                    onDown = { if (index > 0) vm.moveLayer(index, index - 1) },
-                    onRemove = { vm.removeLayer(index) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LayerRow(
-    index: Int, name: String, enabled: Boolean, selected: Boolean, canRemove: Boolean,
-    onSelect: () -> Unit, onToggle: () -> Unit, onUp: () -> Unit, onDown: () -> Unit, onRemove: () -> Unit
-) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(if (selected) GlitchColors.accentSoft else GlitchColors.surfaceHigh)
-            .border(1.dp, if (selected) GlitchColors.accent else GlitchColors.border, RoundedCornerShape(14.dp))
-            .clickable { onSelect() }.padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SmallIcon(if (enabled) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff, onToggle,
-            tint = if (enabled) GlitchColors.textPrimary else GlitchColors.textMuted)
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(name, color = GlitchColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Layer ${index + 1}", color = GlitchColors.textMuted, fontSize = 10.sp)
-        }
-        SmallIcon(Icons.Rounded.KeyboardArrowUp, onUp, tint = GlitchColors.textSecondary)
-        SmallIcon(Icons.Rounded.KeyboardArrowDown, onDown, tint = GlitchColors.textSecondary)
-        if (canRemove) SmallIcon(Icons.Rounded.Delete, onRemove, tint = GlitchColors.danger)
-    }
-}
-
-@Composable
-private fun SmallIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit, tint: Color) {
-    val haptics = rememberHaptics()
-    Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).clickable { haptics.click(); onClick() }, contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun MaskPanel(vm: EditorViewModel) {
-    val layer = vm.selected ?: run { PanelHint("Select a layer to mask."); return }
-    Column(Modifier.verticalScroll(rememberScrollState())) {
-        SegmentedTabs(
-            items = listOf("None", "Radial", "Linear", "Brush"),
-            selectedIndex = layer.maskType.ordinal,
-            onSelect = { vm.setMaskType(MaskType.entries[it]) }
-        )
-        Spacer(Modifier.height(10.dp))
-        when (layer.maskType) {
-            MaskType.NONE -> PanelHint("The effect applies to the whole image. Pick a shape or brush to blend it locally.")
-            MaskType.BRUSH -> {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GradientButton(if (vm.maskEditing) "Done" else "Paint", Icons.Rounded.Brush, onClick = { vm.toggleMaskEditing() })
-                    GlitchChip(if (layer.brushErase) "Erase" else "Draw", layer.brushErase, onClick = { vm.toggleBrushErase() })
-                    Spacer(Modifier.weight(1f))
-                    GlitchChip("Fill", false, onClick = { vm.fillMask(true) })
-                    GlitchChip("Clear", false, onClick = { vm.fillMask(false) })
-                }
                 Spacer(Modifier.height(8.dp))
-                LabeledSlider("Brush Size", layer.brushSize, 0.02f, 0.4f, onChange = { vm.setBrushSize(it) })
-                LabeledSlider("Hardness", layer.brushHardness, 0f, 1f, onChange = { vm.setBrushHardness(it) })
-                MaskInvertRow(layer.maskInvert) { vm.toggleMaskInvert() }
-                Spacer(Modifier.height(12.dp))
-            }
-            else -> {
-                LabeledSlider("Center X", layer.maskCx, 0f, 1f, onChange = { vm.setMaskCenter(it, layer.maskCy) })
-                LabeledSlider("Center Y", layer.maskCy, 0f, 1f, onChange = { vm.setMaskCenter(layer.maskCx, it) })
-                if (layer.maskType == MaskType.RADIAL) LabeledSlider("Size", layer.maskSize, 0.05f, 1f, onChange = { vm.setMaskSize(it) })
-                LabeledSlider("Feather", layer.maskFeather, 0.001f, 0.6f, onChange = { vm.setMaskFeather(it) })
-                if (layer.maskType == MaskType.LINEAR) LabeledSlider("Angle", layer.maskAngle, 0f, 6.2831f, onChange = { vm.setMaskAngle(it) })
-                MaskInvertRow(layer.maskInvert) { vm.toggleMaskInvert() }
-                Spacer(Modifier.height(12.dp))
+                // Selected category gets a coloured underline indicator; others a gap.
+                Box(
+                    Modifier
+                        .size(width = 16.dp, height = 2.dp)
+                        .clip(CircleShape)
+                        .background(if (isSel) dot else Color.Transparent),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MaskInvertRow(inverted: Boolean, onToggle: () -> Unit) {
-    Spacer(Modifier.height(6.dp))
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("Invert mask", color = GlitchColors.textSecondary, fontSize = 13.sp)
-        Spacer(Modifier.weight(1f))
-        GlitchChip(if (inverted) "On" else "Off", inverted, onClick = onToggle)
+private fun EffectRow(
+    category: EffectCategory,
+    selected: ShaderEffect,
+    onSelect: (ShaderEffect) -> Unit,
+) {
+    val colors = GlitchTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        EffectRepository.inCategory(category).forEach { fx ->
+            val isSel = fx.id == selected.id
+            val accent = categoryColor(fx.category, colors)
+            Box(
+                Modifier
+                    .width(88.dp)
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSel) colors.panelElevated else colors.panelPressed)
+                    .border(
+                        1.5.dp,
+                        if (isSel) accent else colors.stroke,
+                        RoundedCornerShape(12.dp),
+                    )
+                    .clickableNoRipple { onSelect(fx) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                // Selected tile carries a small accent dot top-left for a strong state.
+                if (isSel) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                }
+                Text(
+                    fx.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSel) colors.textHigh else colors.textMed,
+                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 2,
+                    modifier = Modifier.align(Alignment.BottomStart),
+                )
+            }
+        }
     }
 }
 
+// --- Export ------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PanelHint(text: String) {
-    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = GlitchColors.textMuted, fontSize = 13.sp, textAlign = TextAlign.Center)
-    }
-}
-
-// --- export ----------------------------------------------------------------
-
-@Composable
-private fun ExportSheet(vm: EditorViewModel, glView: GlPhotoView?) {
-    val context = LocalContext.current
-    var format by remember { mutableStateOf(ExportFormat.PNG) }
-    var quality by remember { mutableStateOf(95f) }
-    var frames by remember { mutableStateOf(24f) }
-    var duration by remember { mutableStateOf(2f) }
-    var loop by remember { mutableStateOf(true) }
-    val status = vm.exportStatus
-
-    Box(
-        Modifier.fillMaxSize().background(Color(0xCC050507)).clickable(
-            interactionSource = remember { MutableInteractionSource() }, indication = null
-        ) { if (status !is ExportStatus.Working) { vm.showExport = false; vm.clearExportStatus() } },
-        contentAlignment = Alignment.BottomCenter
+private fun ExportSheet(
+    state: EditorViewModel.State,
+    onDismiss: () -> Unit,
+    onFormat: (ExportFormat) -> Unit,
+    onQuality: (Int) -> Unit,
+    onFrames: (Int) -> Unit,
+    onFps: (Int) -> Unit,
+    onSave: () -> Unit,
+    onShare: () -> Unit,
+) {
+    val colors = GlitchTheme.colors
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = colors.panel,
+        dragHandle = null,
     ) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
-                .background(GlitchColors.surface).border(1.dp, GlitchColors.border, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
-                .windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 12.dp, bottom = 20.dp)
+                .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Export", color = GlitchColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                GhostIconButton(Icons.Rounded.Close, "Close", onClick = {
-                    if (status !is ExportStatus.Working) { vm.showExport = false; vm.clearExportStatus() }
-                })
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Format", color = GlitchColors.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ExportFormat.entries.forEach { f -> GlitchChip(f.label, format == f, onClick = { format = f }) }
-            }
-            Spacer(Modifier.height(14.dp))
-            if (format == ExportFormat.GIF) {
-                if (!vm.hasAnimatedLayer) PanelHint("Add an animated effect (marked with a spark) for a moving GIF.")
-                LabeledSlider("Frames", frames, 8f, 48f, onChange = { frames = it }, valueText = frames.roundToInt().toString())
-                LabeledSlider("Duration (s)", duration, 0.5f, 4f, onChange = { duration = it })
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Loop forever", color = GlitchColors.textSecondary, fontSize = 13.sp)
-                    Spacer(Modifier.weight(1f))
-                    GlitchChip(if (loop) "On" else "Off", loop, onClick = { loop = !loop })
-                }
-            } else if (format != ExportFormat.PNG) {
-                LabeledSlider("Quality", quality, 50f, 100f, onChange = { quality = it }, valueText = quality.roundToInt().toString())
-            }
-            Spacer(Modifier.height(18.dp))
-            when (status) {
-                ExportStatus.Working -> StatusRow(true, "Rendering…")
-                is ExportStatus.Done -> StatusRow(false, if (status.animated) "GIF saved to Gallery" else "Saved to Gallery")
-                ExportStatus.Error -> StatusRow(false, "Could not save. Try again.")
-                null -> Unit
-            }
-            if (status != null) Spacer(Modifier.height(12.dp))
-            GradientButton(
-                text = if (status is ExportStatus.Done) "Done" else "Save to Gallery",
-                icon = if (status is ExportStatus.Done) Icons.Rounded.Check else Icons.Rounded.IosShare,
-                onClick = {
-                    val v = glView ?: return@GradientButton
-                    when (status) {
-                        ExportStatus.Working -> Unit
-                        is ExportStatus.Done -> { vm.showExport = false; vm.clearExportStatus() }
-                        else -> if (format == ExportFormat.GIF) vm.exportGif(context, v, frames.roundToInt(), duration, loop)
-                        else vm.exportStill(context, v, format, quality.roundToInt())
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
+            // Grab handle to match the panel's sheet language.
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 34.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(colors.strokeStrong),
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Export", style = MaterialTheme.typography.titleLarge, color = colors.textHigh)
+                    Text(
+                        "${state.exportFormat.label} · .${state.exportFormat.ext}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textLow,
+                    )
+                }
+                CircleIconButton(Icons.Rounded.Close, "Close", onDismiss, size = 44.dp)
+            }
+            Spacer(Modifier.height(20.dp))
+
+            Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = colors.textLow)
+            Spacer(Modifier.height(12.dp))
+            val formats = ExportFormat.entries
+            SegmentedControl(
+                options = formats.map { it.label },
+                selectedIndex = formats.indexOf(state.exportFormat),
+                onSelect = { onFormat(formats[it]) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            if (state.exportFormat.animated) {
+                GlitchSlider(
+                    label = "Frames",
+                    value = state.gifFrames.toFloat(),
+                    valueRange = 4f..60f,
+                    onValueChange = { onFrames(it.roundToInt()) },
+                    valueText = state.gifFrames.toString(),
+                )
+                Spacer(Modifier.height(16.dp))
+                GlitchSlider(
+                    label = "Frame rate",
+                    value = state.gifFps.toFloat(),
+                    valueRange = 4f..30f,
+                    onValueChange = { onFps(it.roundToInt()) },
+                    valueText = "${state.gifFps} fps",
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Animated effects loop; still effects export a single frame.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textLow,
+                )
+            } else if (state.exportFormat.hasQuality) {
+                GlitchSlider(
+                    label = "Quality",
+                    value = state.quality.toFloat(),
+                    valueRange = 10f..100f,
+                    onValueChange = { onQuality(it.roundToInt()) },
+                    valueText = state.quality.toString(),
+                )
+            } else {
+                Text(
+                    "PNG exports are lossless at full resolution.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textLow,
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExportButton("Share", Icons.Rounded.Share, filled = false, modifier = Modifier.weight(1f)) {
+                    onShare(); onDismiss()
+                }
+                ExportButton("Save", Icons.Rounded.FileDownload, filled = true, modifier = Modifier.weight(1f)) {
+                    onSave(); onDismiss()
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun StatusRow(working: Boolean, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (working) {
-            CircularProgressIndicator(color = GlitchColors.accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(10.dp))
+private fun ExportButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    filled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = GlitchTheme.colors
+    Row(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (filled) colors.accent else colors.panelElevated)
+            .then(
+                if (filled) Modifier else Modifier.border(1.dp, colors.stroke, RoundedCornerShape(12.dp))
+            )
+            .clickableNoRipple { onClick() }
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon, null,
+            tint = if (filled) Color.White else colors.textHigh,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (filled) Color.White else colors.textHigh,
+        )
+    }
+}
+
+@Composable
+private fun ExportOverlay(progress: Float, isAnimated: Boolean) {
+    val colors = GlitchTheme.colors
+    // Smoothly track render progress for animated exports.
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 200),
+        label = "exportProgress",
+    )
+    Box(
+        Modifier
+            .fillMaxSize()
+            // Block touches and scrim the editor while exporting.
+            .pointerInput(Unit) { awaitEachGesture { awaitFirstDown() } }
+            .background(Color.Black.copy(alpha = 0.66f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .padding(horizontal = 40.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(colors.panel)
+                .border(1.dp, colors.stroke, RoundedCornerShape(18.dp))
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (isAnimated) {
+                Text(
+                    "Rendering GIF",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textHigh,
+                )
+                Spacer(Modifier.height(16.dp))
+                // Determinate bar so long GIF renders feel responsive.
+                Box(
+                    Modifier
+                        .width(200.dp)
+                        .height(5.dp)
+                        .clip(CircleShape)
+                        .background(colors.panelPressed)
+                        .drawBehind {
+                            drawRoundRect(
+                                color = colors.accent,
+                                size = Size(size.width * animatedProgress, size.height),
+                                cornerRadius = CornerRadius(size.height / 2f),
+                            )
+                        },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "${(animatedProgress * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.textMed,
+                )
+            } else {
+                CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(36.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Exporting…",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textHigh,
+                )
+            }
         }
-        Text(text, color = GlitchColors.textSecondary, fontSize = 13.sp)
     }
 }

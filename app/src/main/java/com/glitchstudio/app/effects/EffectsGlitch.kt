@@ -1,196 +1,210 @@
 package com.glitchstudio.app.effects
 
-private val C = Categories.GLITCH
+import com.glitchstudio.app.effects.EffectCategory.GLITCH
 
-val glitchEffects: List<Effect> = listOf(
+internal val glitchEffects: List<ShaderEffect> = listOf(
 
-    Effect(
-        id = "rgb_split", name = "RGB Split", category = C,
-        params = listOf(
-            EffectParam("Amount", 0f, 0.1f, 0.02f),
-            EffectParam("Angle", 0f, 6.2831f, 0f)
+    fx("rgbsplit", "RGB Split", GLITCH, "Offset the colour channels apart.",
+        listOf(
+            P("Amount", 0f, 0.1f, 0.02f),
+            P("Angle", 0f, 1f, 0f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            vec2 dir = vec2(cos(p1), sin(p1)) * p0;
-            float r = tex(uv + dir).r;
-            float g = tex(uv).g;
-            float b = tex(uv - dir).b;
-            return vec4(r, g, b, 1.0);
-        }"""
-    ),
+        """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float a = u_p1 * 6.28318;
+            vec2 off = vec2(cos(a), sin(a)) * u_p0;
+            float r = texture2D(u_Texture, uv + off).r;
+            float g = texture2D(u_Texture, uv).g;
+            float b = texture2D(u_Texture, uv - off).b;
+            gl_FragColor = vec4(r, g, b, 1.0);
+        }
+        """),
 
-    Effect(
-        id = "digital_glitch", name = "Digital Glitch", category = C, animated = true,
-        params = listOf(
-            EffectParam("Intensity", 0f, 1f, 0.5f),
-            EffectParam("Speed", 0f, 10f, 3f),
-            EffectParam("Blocks", 4f, 80f, 24f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            float t = floor(uTime * p1 * 5.0);
-            float line = floor(uv.y * p2);
-            float n = hash21(vec2(line, t));
-            float gate = step(0.7, hash21(vec2(line * 1.3, t)));
-            float shift = (n - 0.5) * 0.3 * p0 * gate;
-            vec2 uv2 = uv; uv2.x += shift;
-            float r = tex(uv2 + vec2(0.01 * p0, 0.0)).r;
-            float g = tex(uv2).g;
-            float b = tex(uv2 - vec2(0.01 * p0, 0.0)).b;
-            vec3 c = vec3(r, g, b);
-            float blk = step(0.96, hash21(vec2(line * 2.7, t + 1.0)));
-            c = mix(c, vec3(hash21(vec2(uv.y * 50.0, t))), blk * p0 * 0.5);
-            return vec4(c, 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "scanline_tear", name = "Scanline Tear", category = C, animated = true,
-        params = listOf(
-            EffectParam("Strength", 0f, 0.2f, 0.05f),
-            EffectParam("Speed", 0f, 10f, 2f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            float t = uTime * p1;
-            float tear = sin(uv.y * 80.0 + t * 6.0) * step(0.5, fract(uv.y * 4.0 + t));
-            uv.x += tear * p0 * 0.1;
-            vec3 c = tex(uv);
-            c *= 0.9 + 0.1 * sin(uv.y * 700.0);
-            return vec4(c, 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "pixel_streak", name = "Pixel Streak", category = C,
-        params = listOf(
-            EffectParam("Threshold", 0f, 1f, 0.55f),
-            EffectParam("Length", 0f, 0.3f, 0.12f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            vec3 c = tex(uv);
-            float steps = 24.0;
-            for (int i = 1; i < 24; i++) {
-                float fi = float(i) / steps;
-                vec3 sc = tex(vec2(uv.x - fi * p1, uv.y));
-                if (luma(sc) > p0) { c = max(c, sc * (1.0 - fi)); }
-            }
-            return vec4(c, 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "datamosh", name = "Datamosh", category = C, animated = true,
-        params = listOf(
-            EffectParam("Block Size", 4f, 64f, 16f),
-            EffectParam("Displace", 0f, 0.3f, 0.08f),
-            EffectParam("Seed", 0f, 10f, 1f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            vec2 grid = floor(uv * uResolution / max(p0, 1.0));
-            float t = floor(uTime * 2.0 + p2);
-            vec2 off = (vec2(hash21(grid + t), hash21(grid * 1.7 - t)) - 0.5) * p1;
-            float move = step(0.6, hash21(grid * 0.3 + t * 0.7));
-            return vec4(tex(uv + off * move), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "wave_glitch", name = "Wave Glitch", category = C, animated = true,
-        params = listOf(
-            EffectParam("Amplitude", 0f, 0.1f, 0.02f),
-            EffectParam("Frequency", 1f, 60f, 20f),
-            EffectParam("Speed", 0f, 10f, 3f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
-            uv.x += sin(uv.y * p1 + uTime * p2) * p0;
-            return vec4(tex(uv), 1.0);
-        }"""
-    ),
-
-    Effect(
-        id = "chromatic", name = "Chromatic Aberration", category = C,
-        params = listOf(
-            EffectParam("Strength", 0f, 0.05f, 0.012f),
-            EffectParam("Falloff", 0f, 3f, 1.5f)
-        ),
-        body = """
-        vec4 process(vec2 uv) {
+    fx("chromab", "Chromatic Aberration", GLITCH, "Radial colour fringing from centre.",
+        listOf(P("Amount", 0f, 0.12f, 0.03f)),
+        """
+        void main(){
+            vec2 uv = v_TexCoord;
             vec2 d = uv - 0.5;
-            float r2 = dot(d, d);
-            float k = p0 * pow(r2, p1 * 0.5) * 8.0;
-            vec2 dir = normalize(d + 1e-5);
-            vec3 c;
-            c.r = tex(uv + dir * k).r;
-            c.g = tex(uv).g;
-            c.b = tex(uv - dir * k).b;
-            return vec4(c, 1.0);
-        }"""
-    ),
+            float r = texture2D(u_Texture, uv + d * u_p0).r;
+            float g = texture2D(u_Texture, uv).g;
+            float b = texture2D(u_Texture, uv - d * u_p0).b;
+            gl_FragColor = vec4(r, g, b, 1.0);
+        }
+        """),
 
-    Effect(
-        id = "vhs", name = "VHS", category = C, animated = true,
-        params = listOf(
-            EffectParam("Noise", 0f, 1f, 0.4f),
-            EffectParam("Wobble", 0f, 0.05f, 0.01f),
-            EffectParam("Chroma", 0f, 0.03f, 0.008f),
-            EffectParam("Scanline", 0f, 1f, 0.5f)
+    fx("scanlines", "Scanlines", GLITCH, "Dark CRT raster lines.",
+        listOf(
+            P("Count", 100f, 1200f, 600f),
+            P("Intensity", 0f, 1f, 0.5f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            float t = uTime;
-            uv.x += sin(uv.y * 120.0 + t * 5.0) * p1;
-            uv.x += (hash21(vec2(floor(uv.y * 200.0), floor(t * 15.0))) - 0.5) * p1 * 2.0;
-            vec3 c;
-            c.r = tex(uv + vec2(p2, 0.0)).r;
-            c.g = tex(uv).g;
-            c.b = tex(uv - vec2(p2, 0.0)).b;
-            float n = hash21(uv * uResolution + t * 50.0);
-            c += (n - 0.5) * p0 * 0.5;
-            c *= 1.0 - p3 * 0.3 * (0.5 + 0.5 * sin(uv.y * uResolution.y * 2.0));
-            return vec4(c, 1.0);
-        }"""
-    ),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            float s = sin(v_TexCoord.y * u_p0 * 3.14159) * 0.5 + 0.5;
+            c *= 1.0 - u_p1 * (1.0 - s);
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
 
-    Effect(
-        id = "bad_signal", name = "Bad Signal", category = C, animated = true,
-        params = listOf(
-            EffectParam("Noise", 0f, 1f, 0.5f),
-            EffectParam("Tearing", 0f, 0.3f, 0.1f),
-            EffectParam("Roll", 0f, 1f, 0.4f)
+    fx("vhs", "VHS", GLITCH, "Tape jitter, chroma bleed and noise.",
+        listOf(
+            P("Distortion", 0f, 0.1f, 0.02f),
+            P("Noise", 0f, 0.4f, 0.12f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            float t = uTime;
-            float jump = step(0.985, hash21(vec2(floor(t * 3.0), 1.0)));
-            uv.y = fract(uv.y + jump * p2 * hash21(vec2(floor(t * 3.0), 2.0)));
-            float line = floor(uv.y * uResolution.y);
-            float tear = (hash21(vec2(line, floor(t * 20.0))) - 0.5);
-            uv.x += tear * step(0.7, abs(tear) * 2.0) * p1;
-            vec3 c = tex(uv);
-            float n = hash21(uv * uResolution + t * 99.0);
-            c = mix(c, vec3(n), step(0.92, n) * p0);
-            return vec4(c, 1.0);
-        }"""
-    ),
+        LIB_NOISE + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float line = floor(uv.y * u_Resolution.y);
+            float jck = step(0.96, hash11(line * 0.07 + floor(u_Time * 12.0)));
+            uv.x += (hash11(line + floor(u_Time * 15.0)) - 0.5) * u_p0 * jck;
+            float sh = u_p0 * 0.5 + 0.003;
+            float r = texture2D(u_Texture, uv + vec2(sh, 0.0)).r;
+            float g = texture2D(u_Texture, uv).g;
+            float b = texture2D(u_Texture, uv - vec2(sh, 0.0)).b;
+            vec3 c = vec3(r, g, b);
+            c += (hash21(uv * u_Resolution * 0.5 + u_Time) - 0.5) * u_p1;
+            c *= 0.9 + 0.1 * sin(uv.y * u_Resolution.y * 1.5);
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """, animated = true),
 
-    Effect(
-        id = "channel_shift", name = "Channel Shift", category = C,
-        params = listOf(
-            EffectParam("Red X", -0.05f, 0.05f, 0.012f),
-            EffectParam("Green X", -0.05f, 0.05f, 0f),
-            EffectParam("Blue X", -0.05f, 0.05f, -0.012f)
+    fx("blocks", "Digital Blocks", GLITCH, "Datamosh blocks tear and swap.",
+        listOf(
+            P("Intensity", 0f, 1f, 0.3f),
+            P("Blocks", 4f, 40f, 16f),
+            P("Speed", 1f, 30f, 12f),
         ),
-        body = """
-        vec4 process(vec2 uv) {
-            float r = tex(uv + vec2(p0, 0.0)).r;
-            float g = tex(uv + vec2(p1, 0.0)).g;
-            float b = tex(uv + vec2(p2, 0.0)).b;
-            return vec4(r, g, b, 1.0);
-        }"""
-    )
+        LIB_NOISE + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float blocks = floor(u_p1);
+            vec2 g = floor(uv * blocks);
+            float t = floor(u_Time * u_p2);
+            float r = hash21(g + t);
+            float r2 = hash21(g * 1.7 + t);
+            vec2 off = vec2(0.0);
+            if (r > 1.0 - u_p0) off.x = (r2 - 0.5) * 0.25;
+            vec3 c = texture2D(u_Texture, fract(uv + off)).rgb;
+            if (r > 1.0 - u_p0 * 0.4) c = c.gbr;
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """, animated = true),
+
+    fx("sliceshift", "Slice Shift", GLITCH, "Horizontal slices jump sideways.",
+        listOf(
+            P("Intensity", 0f, 1f, 0.4f),
+            P("Slices", 5f, 60f, 24f),
+            P("Speed", 1f, 30f, 10f),
+        ),
+        LIB_NOISE + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float slices = floor(u_p1);
+            float row = floor(uv.y * slices);
+            float t = floor(u_Time * u_p2);
+            float h = hash21(vec2(row, t));
+            float shift = step(1.0 - u_p0, h) * (hash11(row + t) - 0.5) * 0.35;
+            uv.x = fract(uv.x + shift);
+            gl_FragColor = vec4(texture2D(u_Texture, uv).rgb, 1.0);
+        }
+        """, animated = true),
+
+    fx("datamosh", "Data Mosh", GLITCH, "Blocks smear in random directions.",
+        listOf(
+            P("Intensity", 0f, 1f, 0.5f),
+            P("Block", 8f, 60f, 24f),
+            P("Speed", 0f, 5f, 1f),
+        ),
+        LIB_NOISE + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float bs = floor(u_p1);
+            vec2 block = floor(uv * bs) / bs;
+            float n = vnoise(block * 3.0 + u_Time * u_p2);
+            vec2 dir = vec2(vnoise(block + 1.0), vnoise(block + 5.0)) - 0.5;
+            uv += dir * step(1.0 - u_p0, n) * 0.15;
+            gl_FragColor = vec4(texture2D(u_Texture, fract(uv)).rgb, 1.0);
+        }
+        """, animated = true),
+
+    fx("badsignal", "Bad Signal", GLITCH, "Static bursts and a rolling band.",
+        listOf(P("Static", 0f, 1f, 0.3f)),
+        LIB_NOISE + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            float bar = sin((uv.y + u_Time * 0.2) * 6.28318);
+            float d = step(0.95, hash11(floor(uv.y * 120.0) + floor(u_Time * 8.0)));
+            uv.x += d * (hash11(uv.y + u_Time) - 0.5) * 0.1;
+            vec3 c = texture2D(u_Texture, fract(uv)).rgb;
+            float n = hash21(uv * u_Resolution + u_Time);
+            c = mix(c, vec3(n), u_p0 * (0.5 + 0.5 * bar));
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """, animated = true),
+
+    fx("pixeldrift", "Pixel Drift", GLITCH, "Bright pixels smear sideways.",
+        listOf(
+            P("Threshold", 0f, 1f, 0.6f),
+            P("Length", 0f, 0.3f, 0.1f),
+        ),
+        LIB_LUMA + """
+        void main(){
+            vec2 uv = v_TexCoord;
+            vec3 c = texture2D(u_Texture, uv).rgb;
+            float l = luma(c);
+            if (l > u_p0) {
+                float drag = (l - u_p0) * u_p1;
+                c = texture2D(u_Texture, vec2(fract(uv.x - drag), uv.y)).rgb;
+            }
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
+
+    fx("chromapulse", "Chromatic Pulse", GLITCH, "Colour fringe that throbs over time.",
+        listOf(
+            P("Amount", 0f, 0.1f, 0.04f),
+            P("Speed", 0f, 10f, 4f),
+        ),
+        """
+        void main(){
+            vec2 uv = v_TexCoord;
+            vec2 d = uv - 0.5;
+            float amt = u_p0 * (0.5 + 0.5 * sin(u_Time * u_p1));
+            float r = texture2D(u_Texture, uv + d * amt).r;
+            float g = texture2D(u_Texture, uv).g;
+            float b = texture2D(u_Texture, uv - d * amt).b;
+            gl_FragColor = vec4(r, g, b, 1.0);
+        }
+        """, animated = true),
+
+    fx("ghosting", "Ghosting", GLITCH, "Analogue TV echo of the image.",
+        listOf(
+            P("Offset", 0f, 0.1f, 0.03f),
+            P("Amount", 0f, 1f, 0.5f),
+        ),
+        """
+        void main(){
+            vec2 uv = v_TexCoord;
+            vec3 c = texture2D(u_Texture, uv).rgb;
+            vec3 ghost = texture2D(u_Texture, uv - vec2(u_p0, 0.0)).rgb;
+            c = mix(c, max(c, ghost), u_p1);
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
+
+    fx("channelswap", "Channel Swap", GLITCH, "Rotate the RGB channels.",
+        listOf(P("Mode", 0f, 3f, 1f)),
+        """
+        void main(){
+            vec3 c = texture2D(u_Texture, v_TexCoord).rgb;
+            float m = floor(u_p0 + 0.5);
+            if (m < 0.5) c = c.rgb;
+            else if (m < 1.5) c = c.gbr;
+            else if (m < 2.5) c = c.brg;
+            else c = c.bgr;
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """),
 )

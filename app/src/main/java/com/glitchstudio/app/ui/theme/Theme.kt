@@ -1,82 +1,97 @@
 package com.glitchstudio.app.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 
-/** Flat, Figma-inspired dark palette. */
-object GlitchColors {
-    val background = Color(0xFF0B0B10)
-    val surface = Color(0xFF15151D)
-    val surfaceHigh = Color(0xFF1E1E28)
-    val surfaceTop = Color(0xFF232330)
-    val border = Color(0xFF2A2A38)
-    val borderStrong = Color(0xFF3A3A4D)
-
-    val textPrimary = Color(0xFFECECF2)
-    val textSecondary = Color(0xFF9A9AAB)
-    val textMuted = Color(0xFF63637A)
-
-    val accent = Color(0xFF7C5CFF)
-    val accentSoft = Color(0xFF2A2540)
-    val cyan = Color(0xFF2DE2E6)
-    val magenta = Color(0xFFFF3DCB)
-    val danger = Color(0xFFFF5C7A)
-    val success = Color(0xFF3DE08A)
-
-    val brand: Brush get() = Brush.horizontalGradient(listOf(cyan, magenta))
-    val accentGradient: Brush get() = Brush.horizontalGradient(listOf(accent, magenta))
+/**
+ * Extended design tokens that go beyond the Material3 [androidx.compose.material3.ColorScheme].
+ * Access through [GlitchTheme.colors] inside composables.
+ */
+@Immutable
+data class GlitchColors(
+    val backdrop: Color,
+    val panel: Color,
+    val panelElevated: Color,
+    val panelPressed: Color,
+    val stroke: Color,
+    val strokeStrong: Color,
+    val textHigh: Color,
+    val textMed: Color,
+    val textLow: Color,
+    val accent: Color,
+    val accentBright: Color,
+    val accentPurple: Color,
+    val accentPink: Color,
+    val accentTeal: Color,
+    val accentAmber: Color,
+    val danger: Color,
+    val success: Color,
+) {
+    val accentGradient: List<Color> get() = listOf(accent, accentPurple)
+    val rgbGradient: List<Color> get() = listOf(accentPink, accentTeal, accent)
 }
 
-private val glitchTypography = Typography(
-    titleLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 0.5.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp),
-    labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.3.sp),
-    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp, letterSpacing = 0.2.sp),
-    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp),
-    bodySmall = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp)
+private val DefaultGlitchColors = GlitchColors(
+    backdrop = Ink900,
+    panel = Ink800,
+    panelElevated = Ink750,
+    panelPressed = Ink700,
+    stroke = Stroke,
+    strokeStrong = StrokeStrong,
+    textHigh = TextHigh,
+    textMed = TextMed,
+    textLow = TextLow,
+    accent = Accent,
+    accentBright = AccentBright,
+    accentPurple = AccentPurple,
+    accentPink = AccentPink,
+    accentTeal = AccentTeal,
+    accentAmber = AccentAmber,
+    danger = Danger,
+    success = Success,
 )
 
-private val glitchScheme = darkColorScheme(
-    primary = GlitchColors.accent,
+val LocalGlitchColors = staticCompositionLocalOf { DefaultGlitchColors }
+
+private val GlitchM3Dark = darkColorScheme(
+    primary = Accent,
     onPrimary = Color.White,
-    secondary = GlitchColors.cyan,
-    background = GlitchColors.background,
-    onBackground = GlitchColors.textPrimary,
-    surface = GlitchColors.surface,
-    onSurface = GlitchColors.textPrimary,
-    surfaceVariant = GlitchColors.surfaceHigh,
-    onSurfaceVariant = GlitchColors.textSecondary,
-    outline = GlitchColors.border,
-    error = GlitchColors.danger
+    secondary = AccentPurple,
+    onSecondary = Color.White,
+    background = Ink900,
+    onBackground = TextHigh,
+    surface = Ink800,
+    onSurface = TextHigh,
+    surfaceVariant = Ink750,
+    onSurfaceVariant = TextMed,
+    outline = Stroke,
+    error = Danger,
 )
 
-// Expressive-language shapes: large, rounded, friendly corners.
-private val expressiveShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(26.dp),
-    extraLarge = RoundedCornerShape(34.dp)
-)
+object GlitchTheme {
+    val colors: GlitchColors
+        @Composable get() = LocalGlitchColors.current
+}
 
 @Composable
-fun GlitchTheme(content: @Composable () -> Unit) {
-    // Stable Material 3 styled in the Material 3 Expressive language (large rounded
-    // shapes, vibrant accents, springy motion applied at the component level).
-    MaterialTheme(
-        colorScheme = glitchScheme,
-        typography = glitchTypography,
-        shapes = expressiveShapes,
-        content = content
-    )
+fun GlitchTheme(
+    @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    // The studio is intentionally always dark to keep the canvas neutral.
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalGlitchColors provides DefaultGlitchColors
+    ) {
+        MaterialTheme(
+            colorScheme = GlitchM3Dark,
+            typography = GlitchTypography,
+            shapes = GlitchShapes,
+            content = content,
+        )
+    }
 }

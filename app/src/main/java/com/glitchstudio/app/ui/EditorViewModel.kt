@@ -1,335 +1,177 @@
 package com.glitchstudio.app.ui
 
-import android.content.Context
+import android.app.Application
 import android.graphics.Bitmap
-import android.graphics.BlurMaskFilter
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.glitchstudio.app.effects.Categories
-import com.glitchstudio.app.effects.Effect
-import com.glitchstudio.app.effects.EffectRegistry
+import com.glitchstudio.app.effects.EffectCategory
+import com.glitchstudio.app.effects.EffectRepository
+import com.glitchstudio.app.effects.ShaderEffect
 import com.glitchstudio.app.export.ExportFormat
-import com.glitchstudio.app.export.GifEncoder
-import com.glitchstudio.app.export.MediaSaver
-import com.glitchstudio.app.gl.GlPhotoView
-import com.glitchstudio.app.gl.MaskType
-import com.glitchstudio.app.gl.RenderLayer
+import com.glitchstudio.app.export.GifRenderer
+import com.glitchstudio.app.export.ImageExporter
+import com.glitchstudio.app.export.ImageRenderer
+import com.glitchstudio.app.util.BitmapUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-enum class PanelTab(val label: String) {
-    EFFECTS("Effects"), ADJUST("Adjust"), LAYERS("Layers"), MASK("Mask")
-}
+/**
+ * Owns the editing session: the loaded image, the selected effect and its live
+ * parameter values, and the export pipeline. The view layer observes [state] and
+ * feeds [preview] into the GL preview.
+ */
+class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
-sealed interface ExportStatus {
-    data object Working : ExportStatus
-    data class Done(val uri: Uri, val animated: Boolean) : ExportStatus
-    data object Error : ExportStatus
-}
-
-/** One effect layer as edited in the UI. */
-data class LayerUiState(
-    val id: Long,
-    val effect: Effect,
-    val params: List<Float>,
-    val opacity: Float = 1f,
-    val enabled: Boolean = true,
-    val maskType: MaskType = MaskType.NONE,
-    val maskCx: Float = 0.5f,
-    val maskCy: Float = 0.5f,
-    val maskSize: Float = 0.4f,
-    val maskFeather: Float = 0.18f,
-    val maskAngle: Float = 0f,
-    val maskInvert: Boolean = false,
-    val maskBitmap: Bitmap? = null,
-    val maskRevision: Int = 0,
-    val brushSize: Float = 0.12f,
-    val brushHardness: Float = 0.7f,
-    val brushErase: Boolean = false
-) {
-    fun toRenderLayer(): RenderLayer = RenderLayer(
-        id = id,
-        effect = effect,
-        params = FloatArray(8) { params.getOrElse(it) { 0f } },
-        opacity = opacity,
-        enabled = enabled,
-        maskType = maskType,
-        maskCx = maskCx, maskCy = maskCy,
-        maskSize = maskSize, maskFeather = maskFeather,
-        maskAngle = maskAngle, maskInvert = maskInvert,
-        maskBitmap = maskBitmap, maskRevision = maskRevision
+    data class State(
+        val sourceLoaded: Boolean = false,
+        val isLoading: Boolean = false,
+        val category: EffectCategory = EffectRepository.categories.first(),
+        val effect: ShaderEffect = EffectRepository.firstEffect,
+        val values: List<Float> = EffectRepository.firstEffect.defaultValues().toList(),
+        val compare: Boolean = false,
+        val exportFormat: ExportFormat = ExportFormat.PNG,
+        val quality: Int = 95,
+        val gifFrames: Int = 24,
+        val gifFps: Int = 16,
+        val isExporting: Boolean = false,
+        val exportProgress: Float = 0f,
+        val message: String? = null,
     )
-}
 
-class EditorViewModel : ViewModel() {
+    private val _state = MutableStateFlow(State())
+    val state: StateFlow<State> = _state.asStateFlow()
 
-    var hasImage by mutableStateOf(false); private set
-    val layers = mutableStateListOf<LayerUiState>()
-    var selectedIndex by mutableStateOf(0); private set
-    var playing by mutableStateOf(true); private set
-    var panelTab by mutableStateOf(PanelTab.EFFECTS)
-    var category by mutableStateOf(Categories.GLITCH)
-    var showExport by mutableStateOf(false)
-    var exportStatus by mutableStateOf<ExportStatus?>(null)
-    var maskEditing by mutableStateOf(false)
+    private val _preview = MutableStateFlow<Bitmap?>(null)
+    val preview: StateFlow<Bitmap?> = _preview.asStateFlow()
 
-    /** Whether the bottom tool panel is slid up over the photo. */
-    var panelOpen by mutableStateOf(false)
+    private var sourceBitmap: Bitmap? = null
 
-    /** On-screen zoom/pan of the canvas (preview only). */
-    var viewScale by mutableStateOf(1f); private set
-    var viewPanX by mutableStateOf(0f); private set
-    var viewPanY by mutableStateOf(0f); private set
-
-    /** Cached per-effect preview thumbnails for the current photo. */
-    val thumbnails = mutableStateMapOf<String, Bitmap>()
-
-    /** Bumped on every state change so the GL layer can be refreshed cheaply. */
-    var revision by mutableStateOf(0); private set
-
-    private var nextId = 1L
-    private var imageW = 1
-    private var imageH = 1
-
-    val selected: LayerUiState? get() = layers.getOrNull(selectedIndex)
-
-    val continuousRender: Boolean
-        get() = playing && layers.any { it.enabled && it.effect.animated }
-
-    val hasAnimatedLayer: Boolean
-        get() = layers.any { it.enabled && it.effect.animated }
-
-    fun onImageLoaded(width: Int, height: Int) {
-        imageW = width.coerceAtLeast(1)
-        imageH = height.coerceAtLeast(1)
-        if (layers.isEmpty()) {
-            layers.add(makeLayer(EffectRegistry.original))
-            selectedIndex = 0
-        }
-        hasImage = true
-        thumbnails.clear()
-        resetZoom()
-        touch()
-    }
-
-    // --- panel + zoom -------------------------------------------------------
-
-    fun togglePanel(tab: PanelTab) {
-        if (panelOpen && panelTab == tab) {
-            panelOpen = false
-        } else {
-            panelTab = tab
-            panelOpen = true
-        }
-    }
-
-    fun closePanel() { panelOpen = false }
-
-    fun applyTransform(zoomDelta: Float, panPxX: Float, panPxY: Float, viewW: Float, viewH: Float) {
-        val ns = (viewScale * zoomDelta).coerceIn(1f, 8f)
-        viewScale = ns
-        val lim = ns - 1f
-        if (viewW > 0f) viewPanX = (viewPanX + 2f * panPxX / viewW).coerceIn(-lim, lim)
-        if (viewH > 0f) viewPanY = (viewPanY - 2f * panPxY / viewH).coerceIn(-lim, lim)
-        touch()
-    }
-
-    fun resetZoom() {
-        viewScale = 1f; viewPanX = 0f; viewPanY = 0f
-        touch()
-    }
-
-    fun putThumbnail(id: String, bitmap: Bitmap?) {
-        if (bitmap != null) thumbnails[id] = bitmap
-    }
-
-    fun renderLayers(): List<RenderLayer> = layers.map { it.toRenderLayer() }
-
-    fun selectLayer(index: Int) {
-        if (index in layers.indices) { selectedIndex = index; touch() }
-    }
-
-    fun togglePlaying() { playing = !playing; touch() }
-
-    fun addLayer(effect: Effect = defaultNewEffect()) {
-        layers.add(makeLayer(effect))
-        selectedIndex = layers.lastIndex
-        touch()
-    }
-
-    fun setEffectForSelected(effect: Effect) {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        layers[i] = layer.copy(effect = effect, params = effect.params.map { it.default })
-        touch()
-    }
-
-    fun updateParam(paramIndex: Int, value: Float) {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        if (paramIndex !in layer.params.indices) return
-        val np = layer.params.toMutableList().also { it[paramIndex] = value }
-        layers[i] = layer.copy(params = np)
-        touch()
-    }
-
-    fun resetSelectedParams() {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        layers[i] = layer.copy(params = layer.effect.params.map { it.default }, opacity = 1f)
-        touch()
-    }
-
-    fun setOpacity(value: Float) = updateSelected { it.copy(opacity = value) }
-    fun toggleEnabled(index: Int) {
-        val layer = layers.getOrNull(index) ?: return
-        layers[index] = layer.copy(enabled = !layer.enabled); touch()
-    }
-
-    fun removeLayer(index: Int) {
-        if (layers.size <= 1 || index !in layers.indices) return
-        layers.removeAt(index)
-        if (selectedIndex >= layers.size) selectedIndex = layers.lastIndex
-        touch()
-    }
-
-    fun moveLayer(from: Int, to: Int) {
-        if (from !in layers.indices || to !in layers.indices) return
-        val item = layers.removeAt(from)
-        layers.add(to, item)
-        selectedIndex = to
-        touch()
-    }
-
-    fun setMaskType(type: MaskType) {
-        updateSelected { layer ->
-            if (type == MaskType.BRUSH && layer.maskBitmap == null)
-                layer.copy(maskType = type, maskBitmap = newMaskBitmap())
-            else layer.copy(maskType = type)
-        }
-        if (type != MaskType.BRUSH) maskEditing = false
-    }
-    fun setMaskCenter(x: Float, y: Float) = updateSelected { it.copy(maskCx = x, maskCy = y) }
-    fun setMaskSize(v: Float) = updateSelected { it.copy(maskSize = v) }
-    fun setMaskFeather(v: Float) = updateSelected { it.copy(maskFeather = v) }
-    fun setMaskAngle(v: Float) = updateSelected { it.copy(maskAngle = v) }
-    fun toggleMaskInvert() = updateSelected { it.copy(maskInvert = !it.maskInvert) }
-
-    // --- brush masking ------------------------------------------------------
-
-    fun setBrushSize(v: Float) = updateSelected { it.copy(brushSize = v) }
-    fun setBrushHardness(v: Float) = updateSelected { it.copy(brushHardness = v) }
-    fun toggleBrushErase() = updateSelected { it.copy(brushErase = !it.brushErase) }
-    fun toggleMaskEditing() {
-        maskEditing = !maskEditing
-        // Mask painting uses the un-zoomed fit mapping, so lock zoom while editing.
-        if (maskEditing) resetZoom()
-    }
-
-    /** Paints a stroke (in 0..1 image space) onto the selected layer's mask. */
-    fun paintMaskStroke(x0: Float, y0: Float, x1: Float, y1: Float) {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        if (layer.maskType != MaskType.BRUSH) return
-        val bmp = layer.maskBitmap ?: newMaskBitmap().also {
-            layers[i] = layer.copy(maskBitmap = it)
-        }
-        val target = layers[i].maskBitmap ?: return
-        val canvas = Canvas(target)
-        val minDim = minOf(target.width, target.height).toFloat()
-        val radius = (layer.brushSize * minDim * 0.5f).coerceAtLeast(1f)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (layer.brushErase) Color.BLACK else Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = radius * 2f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-            val blur = (1f - layer.brushHardness) * radius
-            if (blur > 0.5f) maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
-        }
-        val w = target.width
-        val h = target.height
-        canvas.drawLine(x0 * w, y0 * h, x1 * w, y1 * h, paint)
-        layers[i] = layers[i].copy(maskRevision = layers[i].maskRevision + 1)
-        touch()
-    }
-
-    fun fillMask(white: Boolean) {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        if (layer.maskType != MaskType.BRUSH) return
-        val target = layer.maskBitmap ?: newMaskBitmap()
-        target.eraseColor(if (white) Color.WHITE else Color.BLACK)
-        layers[i] = layer.copy(maskBitmap = target, maskRevision = layer.maskRevision + 1)
-        touch()
-    }
-
-    private fun newMaskBitmap(): Bitmap {
-        val long = MASK_RES
-        val (w, h) = if (imageW >= imageH) long to (long * imageH / imageW).coerceAtLeast(1)
-        else (long * imageW / imageH).coerceAtLeast(1) to long
-        return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLACK) }
-    }
-
-    private inline fun updateSelected(transform: (LayerUiState) -> LayerUiState) {
-        val i = selectedIndex
-        val layer = layers.getOrNull(i) ?: return
-        layers[i] = transform(layer)
-        touch()
-    }
-
-    private fun makeLayer(effect: Effect) =
-        LayerUiState(nextId++, effect, effect.params.map { it.default })
-
-    private fun defaultNewEffect(): Effect =
-        EffectRegistry.inCategory(Categories.GLITCH).firstOrNull() ?: EffectRegistry.original
-
-    private fun touch() { revision++ }
-
-    // --- export -------------------------------------------------------------
-
-    fun exportStill(context: Context, view: GlPhotoView, format: ExportFormat, quality: Int) {
-        exportStatus = ExportStatus.Working
-        view.captureStill(MAX_STILL) { bmp ->
-            viewModelScope.launch(Dispatchers.IO) {
-                val uri = bmp?.let { MediaSaver.saveImage(context, it, format, quality) }
-                exportStatus = if (uri != null) ExportStatus.Done(uri, animated = false) else ExportStatus.Error
+    fun loadImage(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            val ctx = getApplication<Application>()
+            val src = withContext(Dispatchers.IO) {
+                BitmapUtils.load(ctx, uri, BitmapUtils.SOURCE_MAX)
             }
+            if (src == null) {
+                _state.update { it.copy(isLoading = false, message = "Couldn't open that image") }
+                return@launch
+            }
+            val previewBmp = withContext(Dispatchers.Default) {
+                BitmapUtils.scaledDown(src, BitmapUtils.PREVIEW_MAX)
+            }
+            sourceBitmap?.recycle()
+            sourceBitmap = src
+            _preview.value?.recycle()
+            _preview.value = previewBmp
+            _state.update { it.copy(sourceLoaded = true, isLoading = false) }
         }
     }
 
-    fun exportGif(context: Context, view: GlPhotoView, frames: Int, durationSec: Float, loop: Boolean) {
-        exportStatus = ExportStatus.Working
-        view.captureFrames(MAX_GIF, frames, durationSec) { list ->
-            viewModelScope.launch(Dispatchers.Default) {
-                if (list.isEmpty()) {
-                    exportStatus = ExportStatus.Error
-                    return@launch
+    fun selectCategory(category: EffectCategory) {
+        _state.update { it.copy(category = category) }
+    }
+
+    fun selectEffect(effect: ShaderEffect) {
+        _state.update {
+            it.copy(effect = effect, values = effect.defaultValues().toList())
+        }
+    }
+
+    fun setValue(index: Int, value: Float) {
+        _state.update {
+            if (index !in it.values.indices) it
+            else it.copy(values = it.values.toMutableList().apply { this[index] = value })
+        }
+    }
+
+    fun resetValues() {
+        _state.update { it.copy(values = it.effect.defaultValues().toList()) }
+    }
+
+    fun setCompare(compare: Boolean) {
+        _state.update { it.copy(compare = compare) }
+    }
+
+    fun setExportFormat(format: ExportFormat) = _state.update { it.copy(exportFormat = format) }
+    fun setQuality(quality: Int) = _state.update { it.copy(quality = quality.coerceIn(10, 100)) }
+    fun setGifFrames(frames: Int) = _state.update { it.copy(gifFrames = frames.coerceIn(4, 60)) }
+    fun setGifFps(fps: Int) = _state.update { it.copy(gifFps = fps.coerceIn(4, 30)) }
+
+    fun clearImage() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        _preview.value?.recycle()
+        _preview.value = null
+        _state.update {
+            State().copy(
+                exportFormat = it.exportFormat,
+                quality = it.quality,
+                gifFrames = it.gifFrames,
+                gifFps = it.gifFps,
+            )
+        }
+    }
+
+    fun consumeMessage() = _state.update { it.copy(message = null) }
+
+    /**
+     * Renders the current effect at full resolution and either saves it to the
+     * gallery or hands a shareable [Uri] to [onShare].
+     */
+    fun export(share: Boolean, onShare: (Uri) -> Unit) {
+        val src = sourceBitmap ?: return
+        val s = _state.value
+        if (s.isExporting) return
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            _state.update { it.copy(isExporting = true, exportProgress = 0f, message = null) }
+            val uri = withContext(Dispatchers.Default) {
+                try {
+                    val eff = s.effect
+                    val vals = s.values.toFloatArray()
+                    if (s.exportFormat == ExportFormat.GIF) {
+                        val bytes = GifRenderer.render(src, eff, vals, s.gifFrames, s.gifFps) { p ->
+                            _state.update { it.copy(exportProgress = p) }
+                        }
+                        if (share) ImageExporter.shareGif(ctx, bytes) else ImageExporter.saveGif(ctx, bytes)
+                    } else {
+                        val bmp = ImageRenderer.render(src, eff, vals)
+                        val out = if (share) ImageExporter.shareImage(ctx, bmp, s.exportFormat, s.quality)
+                        else ImageExporter.saveImage(ctx, bmp, s.exportFormat, s.quality)
+                        bmp.recycle()
+                        out
+                    }
+                } catch (e: Exception) {
+                    null
                 }
-                val delay = (durationSec * 1000f / frames).toInt().coerceAtLeast(20)
-                // repeat: 0 = loop forever, 1 = play once.
-                val bytes = GifEncoder.encode(list, delayMs = delay, repeat = if (loop) 0 else 1)
-                list.forEach { it.recycle() }
-                val uri = MediaSaver.saveBytes(context, bytes, ExportFormat.GIF)
-                exportStatus = if (uri != null) ExportStatus.Done(uri, animated = true) else ExportStatus.Error
             }
+            _state.update {
+                it.copy(
+                    isExporting = false,
+                    exportProgress = 0f,
+                    message = when {
+                        uri == null -> "Export failed"
+                        share -> null
+                        else -> "Saved to Pictures/GlitchStudio"
+                    },
+                )
+            }
+            if (share && uri != null) onShare(uri)
         }
     }
 
-    fun clearExportStatus() { exportStatus = null }
-
-    companion object {
-        const val MAX_STILL = 4096
-        const val MAX_GIF = 480
-        const val MASK_RES = 1024
+    override fun onCleared() {
+        super.onCleared()
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        _preview.value?.recycle()
+        _preview.value = null
     }
 }
