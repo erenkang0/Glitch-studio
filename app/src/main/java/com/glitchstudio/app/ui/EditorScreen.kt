@@ -3,6 +3,8 @@ package com.glitchstudio.app.ui
 import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,7 +58,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,6 +78,7 @@ import com.glitchstudio.app.gl.GLPreviewView
 import com.glitchstudio.app.ui.components.CircleIconButton
 import com.glitchstudio.app.ui.components.GlitchSlider
 import com.glitchstudio.app.ui.components.SegmentedControl
+import com.glitchstudio.app.ui.theme.GlitchColors
 import com.glitchstudio.app.ui.theme.GlitchTheme
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -106,6 +112,7 @@ fun EditorScreen(
         Column(Modifier.fillMaxSize()) {
             EditorTopBar(
                 effectName = state.effect.name,
+                category = state.effect.category,
                 onBack = onBack,
                 onCompareChanged = viewModel::setCompare,
                 onExport = { showExport = true },
@@ -165,6 +172,7 @@ fun EditorScreen(
 @Composable
 private fun EditorTopBar(
     effectName: String,
+    category: EffectCategory,
     onBack: () -> Unit,
     onCompareChanged: (Boolean) -> Unit,
     onExport: () -> Unit,
@@ -173,7 +181,12 @@ private fun EditorTopBar(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .drawBehind {
+                // Hairline rule that grounds the bar against the canvas below.
+                val y = size.height - 0.5.dp.toPx()
+                drawLine(colors.stroke, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+            }
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -187,33 +200,54 @@ private fun EditorTopBar(
                 background = colors.accent, tint = Color.White,
             )
         }
-        Text(
-            effectName,
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.textHigh,
-        )
+        // Centred title block with a category eyebrow above the active effect name.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                category.label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textLow,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                effectName,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.textHigh,
+                maxLines = 1,
+            )
+        }
     }
 }
 
 @Composable
 private fun CompareButton(onCompareChanged: (Boolean) -> Unit) {
     val colors = GlitchTheme.colors
+    var held by remember { mutableStateOf(false) }
     Box(
         Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(colors.panel)
+            .background(if (held) colors.panelElevated else colors.panel)
+            .then(
+                if (held) Modifier.border(1.dp, colors.strokeStrong, CircleShape) else Modifier
+            )
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown()
+                    held = true
                     onCompareChanged(true)
                     waitForUpOrCancellation()
                     onCompareChanged(false)
+                    held = false
                 }
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.Visibility, "Hold to compare", tint = colors.textHigh, modifier = Modifier.size(20.dp))
+        Icon(
+            Icons.Rounded.Visibility,
+            "Hold to compare",
+            tint = if (held) colors.textHigh else colors.textMed,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -229,7 +263,7 @@ private fun EffectCanvas(
     modifier: Modifier = Modifier,
 ) {
     val colors = GlitchTheme.colors
-    Box(modifier.padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.padding(horizontal = 16.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
         if (preview == null) {
             CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(28.dp))
             return@Box
@@ -243,7 +277,10 @@ private fun EffectCanvas(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(aspect)
-                .clip(RoundedCornerShape(8.dp)),
+                .clip(RoundedCornerShape(10.dp))
+                // A faint frame separates the photo from the dark chrome without
+                // tinting it — the image stays the hero.
+                .border(1.dp, colors.stroke, RoundedCornerShape(10.dp)),
         ) {
             androidx.compose.ui.viewinterop.AndroidView(
                 modifier = Modifier.matchParentSize(),
@@ -278,6 +315,24 @@ private fun EffectCanvas(
             ) {
                 if (compare) return@Canvas
                 drawCanvasHandles(effect, values, colors.accent)
+            }
+
+            // While holding to compare, label the original so the swap is legible.
+            if (compare) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "ORIGINAL",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                    )
+                }
             }
         }
     }
@@ -361,6 +416,32 @@ private fun fractionOf(p: com.glitchstudio.app.effects.ShaderParam, v: Float): F
 
 // --- Tool panel: advanced settings + effect browser --------------------------
 
+/**
+ * A restrained, per-category accent used only as a small colour dot so the chrome
+ * stays neutral while groups stay glanceable (matches the brand RGB-split palette).
+ */
+private fun categoryColor(category: EffectCategory, colors: GlitchColors): Color = when (category) {
+    EffectCategory.COLOR -> colors.accent
+    EffectCategory.LIGHT -> colors.accentAmber
+    EffectCategory.STYLIZE -> colors.accentPurple
+    EffectCategory.DISTORT -> colors.accentTeal
+    EffectCategory.GLITCH -> colors.accentPink
+    EffectCategory.BLUR -> colors.accentBright
+    EffectCategory.TEXTURE -> colors.accentTeal
+    EffectCategory.RETRO -> colors.accentAmber
+}
+
+/** Small uppercase eyebrow label that opens a panel section. */
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = GlitchTheme.colors.textLow,
+        modifier = modifier,
+    )
+}
+
 @Composable
 private fun ToolPanel(
     effect: ShaderEffect,
@@ -376,20 +457,44 @@ private fun ToolPanel(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             .background(colors.panel)
+            .border(
+                1.dp, colors.stroke,
+                RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            )
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(top = 14.dp, bottom = 10.dp),
+            .padding(bottom = 12.dp),
     ) {
-        // Header: effect name + reset
+        // Grab handle hints the sheet-like nature of the panel.
+        Box(
+            Modifier
+                .padding(top = 8.dp)
+                .align(Alignment.CenterHorizontally)
+                .size(width = 34.dp, height = 4.dp)
+                .clip(CircleShape)
+                .background(colors.strokeStrong),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Header: effect name + description + reset
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(categoryColor(effect.category, colors)),
+            )
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(effect.name, style = MaterialTheme.typography.titleMedium, color = colors.textHigh)
+                Spacer(Modifier.height(1.dp))
                 Text(
                     effect.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -398,37 +503,46 @@ private fun ToolPanel(
                 )
             }
             if (effect.params.isNotEmpty()) {
+                Spacer(Modifier.width(10.dp))
                 Row(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(colors.panelElevated)
                         .clickableNoRipple { onResetAll() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Refresh, "Reset", tint = colors.textMed, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.Refresh, "Reset", tint = colors.textMed, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Reset", style = MaterialTheme.typography.labelLarge, color = colors.textMed)
                 }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(18.dp))
 
         // Advanced settings (sliders) for the active effect.
         if (effect.params.isEmpty()) {
-            Text(
-                "This effect has no parameters.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textLow,
-                modifier = Modifier.padding(horizontal = 18.dp),
-            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+            ) {
+                Text(
+                    "This effect has no parameters.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textLow,
+                )
+            }
         } else {
+            SectionLabel("ADJUST", Modifier.padding(horizontal = 18.dp))
+            Spacer(Modifier.height(14.dp))
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 220.dp)
+                    .heightIn(max = 224.dp)
                     .padding(horizontal = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 effect.params.forEachIndexed { i, p ->
                     GlitchSlider(
@@ -444,7 +558,16 @@ private fun ToolPanel(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
+        // Hairline separating the active-effect controls from the browser below.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .height(1.dp)
+                .background(colors.stroke),
+        )
+        Spacer(Modifier.height(14.dp))
         CategoryRow(selected = category, onSelect = onSelectCategory)
         Spacer(Modifier.height(12.dp))
         EffectRow(category = category, selected = effect, onSelect = onSelectEffect)
@@ -463,17 +586,27 @@ private fun CategoryRow(selected: EffectCategory, onSelect: (EffectCategory) -> 
     ) {
         EffectRepository.categories.forEach { cat ->
             val isSel = cat == selected
-            Box(
+            val dot = categoryColor(cat, colors)
+            Column(
                 Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(9.dp))
                     .clickableNoRipple { onSelect(cat) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     cat.label.uppercase(),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (isSel) colors.textHigh else colors.textLow,
                     fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium,
+                )
+                Spacer(Modifier.height(6.dp))
+                // Selected category gets a coloured underline indicator; others a gap.
+                Box(
+                    Modifier
+                        .size(width = 16.dp, height = 2.dp)
+                        .clip(CircleShape)
+                        .background(if (isSel) dot else Color.Transparent),
                 )
             }
         }
@@ -496,25 +629,38 @@ private fun EffectRow(
     ) {
         EffectRepository.inCategory(category).forEach { fx ->
             val isSel = fx.id == selected.id
+            val accent = categoryColor(fx.category, colors)
             Box(
                 Modifier
-                    .width(84.dp)
-                    .height(58.dp)
+                    .width(88.dp)
+                    .height(60.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isSel) colors.panelElevated else colors.panelPressed)
-                    .then(
-                        if (isSel) Modifier.border(1.5.dp, colors.accent, RoundedCornerShape(12.dp))
-                        else Modifier
+                    .border(
+                        1.5.dp,
+                        if (isSel) accent else colors.stroke,
+                        RoundedCornerShape(12.dp),
                     )
                     .clickableNoRipple { onSelect(fx) }
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center,
+                    .padding(horizontal = 9.dp, vertical = 8.dp),
             ) {
+                // Selected tile carries a small accent dot top-left for a strong state.
+                if (isSel) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                }
                 Text(
                     fx.name,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (isSel) colors.textHigh else colors.textMed,
+                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Medium,
                     maxLines = 2,
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
         }
@@ -546,18 +692,35 @@ private fun ExportSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp)
+                .padding(top = 10.dp, bottom = 20.dp)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
+            // Grab handle to match the panel's sheet language.
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 34.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(colors.strokeStrong),
+            )
+            Spacer(Modifier.height(16.dp))
+
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Export", style = MaterialTheme.typography.titleLarge, color = colors.textHigh)
-                Spacer(Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("Export", style = MaterialTheme.typography.titleLarge, color = colors.textHigh)
+                    Text(
+                        "${state.exportFormat.label} · .${state.exportFormat.ext}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textLow,
+                    )
+                }
                 CircleIconButton(Icons.Rounded.Close, "Close", onDismiss, size = 36.dp)
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = colors.textLow)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             val formats = ExportFormat.entries
             SegmentedControl(
                 options = formats.map { it.label },
@@ -566,7 +729,7 @@ private fun ExportSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
 
             if (state.exportFormat.animated) {
                 GlitchSlider(
@@ -606,13 +769,13 @@ private fun ExportSheet(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(26.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExportButton("Save", Icons.Rounded.FileDownload, filled = true, modifier = Modifier.weight(1f)) {
-                    onSave(); onDismiss()
-                }
                 ExportButton("Share", Icons.Rounded.Share, filled = false, modifier = Modifier.weight(1f)) {
                     onShare(); onDismiss()
+                }
+                ExportButton("Save", Icons.Rounded.FileDownload, filled = true, modifier = Modifier.weight(1f)) {
+                    onSave(); onDismiss()
                 }
             }
         }
@@ -630,10 +793,13 @@ private fun ExportButton(
     val colors = GlitchTheme.colors
     Row(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(13.dp))
             .background(if (filled) colors.accent else colors.panelElevated)
+            .then(
+                if (filled) Modifier else Modifier.border(1.dp, colors.stroke, RoundedCornerShape(13.dp))
+            )
             .clickableNoRipple { onClick() }
-            .padding(vertical = 14.dp),
+            .padding(vertical = 15.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -654,20 +820,66 @@ private fun ExportButton(
 @Composable
 private fun ExportOverlay(progress: Float, isAnimated: Boolean) {
     val colors = GlitchTheme.colors
+    // Smoothly track render progress for animated exports.
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 200),
+        label = "exportProgress",
+    )
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f)),
+            // Block touches and scrim the editor while exporting.
+            .pointerInput(Unit) { awaitEachGesture { awaitFirstDown() } }
+            .background(Color.Black.copy(alpha = 0.66f)),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(40.dp))
-            Spacer(Modifier.height(16.dp))
-            Text(
-                if (isAnimated) "Rendering GIF ${(progress * 100).roundToInt()}%" else "Exporting…",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-            )
+        Column(
+            Modifier
+                .padding(horizontal = 40.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(colors.panel)
+                .border(1.dp, colors.stroke, RoundedCornerShape(18.dp))
+                .padding(horizontal = 28.dp, vertical = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (isAnimated) {
+                Text(
+                    "Rendering GIF",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textHigh,
+                )
+                Spacer(Modifier.height(16.dp))
+                // Determinate bar so long GIF renders feel responsive.
+                Box(
+                    Modifier
+                        .width(200.dp)
+                        .height(5.dp)
+                        .clip(CircleShape)
+                        .background(colors.panelPressed)
+                        .drawBehind {
+                            drawRoundRect(
+                                color = colors.accent,
+                                size = Size(size.width * animatedProgress, size.height),
+                                cornerRadius = CornerRadius(size.height / 2f),
+                            )
+                        },
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "${(animatedProgress * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.textMed,
+                )
+            } else {
+                CircularProgressIndicator(color = colors.accent, modifier = Modifier.size(36.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Exporting…",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textHigh,
+                )
+            }
         }
     }
 }
